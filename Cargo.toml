@@ -3,6 +3,16 @@ name = "rust360"
 version = "0.1.0"
 edition = "2021"
 
+[profile.dev]
+#    0: no optimizations
+#    1: basic optimizations
+#    2: some optimizations
+#    3: all optimizations
+#    "s": optimize for binary size
+#    "z": optimize for binary size, but also turn off loop vectorization.
+opt-level = 1
+incremental = true
+
 [dependencies]
 winit = { version = "0.30.5" }
 wgpu = { version = "*" }
