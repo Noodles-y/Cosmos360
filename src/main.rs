@@ -1,6 +1,8 @@
 mod application;
 mod image_data;
 mod state;
+mod camera;
+mod camera_controller;
 
 use application::Application;
 use winit::event_loop::{EventLoop, ControlFlow};

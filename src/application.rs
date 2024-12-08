@@ -39,21 +39,34 @@ impl ApplicationHandler for Application {
         window_id: WindowId,
         event: WindowEvent,
     ) {
-        let window = self.state.as_ref().unwrap().window();
+        let state = self.state.as_mut().unwrap();
+        //let window = state.window();
 
-        if window.id() == window_id {
-            match event {
-                WindowEvent::CloseRequested => {
-                    println!("Closing window");
-                    event_loop.exit();
+        if state.window().id() == window_id {
+            
+            if state.input(&event) {
+                state.window().request_redraw();
+            }
+            else {
+                match event {
+                    WindowEvent::CloseRequested => {
+                        println!("Closing window");
+                        event_loop.exit();
+                    }
+                    //WindowEvent::KeyboardInput => {
+                    //    self.state.as_mut().unwrap().input(&event);
+                    //}
+                    WindowEvent::RedrawRequested => {
+                        //executor::block_on( run(self.window.as_ref().unwrap(), &self.image_data) );
+                        //window.request_redraw();
+
+                        self.state.as_mut().unwrap().update();
+
+                        self.state.as_mut().unwrap().render().unwrap();// use unwrap() to panic in case
+                                                                       // of render fail
+                    }
+                    _ => (),
                 }
-                WindowEvent::RedrawRequested => {
-                    //executor::block_on( run(self.window.as_ref().unwrap(), &self.image_data) );
-                    //window.request_redraw();
-                    self.state.as_mut().unwrap().render().unwrap();// use unwrap() to panic in case
-                                                                   // of render fail
-                }
-                _ => (),
             }
         }
     }

@@ -1,5 +1,8 @@
 use futures::executor;
 use crate::image_data::ImageData;
+use crate::camera::Camera;
+use crate::camera::CameraUniform;
+use crate::camera_controller::CameraController;
 
 use winit::window::Window;
 use winit::event::WindowEvent;
@@ -16,11 +19,15 @@ use wgpu::{
 use wgpu::util::DeviceExt;
 
 use std::sync::Arc;
+use std::fs::File;
+use std::io::prelude::*;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 struct Vertex {
-    position: [f32;3],
+    //position: [f32;3],
+    //tex_coords: [f32;2],
+    position: [f32;4],
     tex_coords: [f32;2],
 }
 
@@ -32,7 +39,7 @@ unsafe impl bytemuck::Zeroable for Vertex {}
 
 impl Vertex {
     const ATTRIBS: [wgpu::VertexAttribute; 2] =
-        wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x2];
+        wgpu::vertex_attr_array![0 => Float32x4, 1 => Float32x2];
 
     fn desc() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
@@ -44,13 +51,13 @@ impl Vertex {
 }
 
 const VERTICES: &[Vertex] = &[
-    Vertex{ position: [ 1.0,  1.0, 0.0], tex_coords: [1.0, 0.0],},// top right
-    Vertex{ position: [-1.0,  1.0, 0.0], tex_coords: [0.0, 0.0],},// top left
-    Vertex{ position: [-1.0, -1.0, 0.0], tex_coords: [0.0, 1.0],},// bot left
+    Vertex{ position: [ 1.0,  1.0, 0.0, 0.0], tex_coords: [1.0, 0.0],},// top right
+    Vertex{ position: [-1.0,  1.0, 0.0, 0.0], tex_coords: [0.0, 0.0],},// top left
+    Vertex{ position: [-1.0, -1.0, 0.0, 0.0], tex_coords: [0.0, 1.0],},// bot left
 
-    Vertex{ position: [ 1.0,  1.0, 0.0], tex_coords: [1.0, 0.0],},// top right
-    Vertex{ position: [-1.0, -1.0, 0.0], tex_coords: [0.0, 1.0],},// bot left
-    Vertex{ position: [ 1.0, -1.0, 0.0], tex_coords: [1.0, 1.0],},// bot right
+    Vertex{ position: [ 1.0,  1.0, 0.0, 0.0], tex_coords: [1.0, 0.0],},// top right
+    Vertex{ position: [-1.0, -1.0, 0.0, 0.0], tex_coords: [0.0, 1.0],},// bot left
+    Vertex{ position: [ 1.0, -1.0, 0.0, 0.0], tex_coords: [1.0, 1.0],},// bot right
 ];
 
 pub struct State {
@@ -65,6 +72,11 @@ pub struct State {
     num_vertices: u32,
     image_data: ImageData,
     diffuse_bind_group: wgpu::BindGroup,
+    camera: Camera,
+    camera_uniform: CameraUniform,
+    camera_buffer: wgpu::Buffer,
+    camera_bind_group: wgpu::BindGroup,
+    camera_controller: CameraController,
 }
 
 impl State {
@@ -81,10 +93,20 @@ impl State {
         
         surface.configure(&device, &config);
         
+        // Setup camera
+        let (camera, camera_uniform, camera_buffer, camera_bind_group, camera_bind_group_layout) = Self::create_camera(size, &device);
+        
         let (image_data, texture_bind_group_layout, diffuse_bind_group) = Self::create_texture(&device, &queue);
         
         let shader = Self::create_shader(&device);
-        let render_pipeline = Self::create_render_pipeline(&device, &shader, &config, &texture_bind_group_layout);
+        let render_pipeline = Self::create_render_pipeline(
+            &device, 
+            &shader, 
+            &config, 
+            &texture_bind_group_layout,
+            &camera_bind_group_layout,
+        );
+
         let vertex_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
                 label: Some("Vertex Buffer"),
@@ -94,7 +116,8 @@ impl State {
         );
 
         let num_vertices = VERTICES.len() as u32;
-        println!("Number of vertices : {num_vertices}");
+
+        let camera_controller = CameraController::new(2.0);
 
         // Return
         Self {
@@ -109,6 +132,11 @@ impl State {
             num_vertices,
             image_data,
             diffuse_bind_group,
+            camera,
+            camera_uniform,
+            camera_buffer,
+            camera_bind_group,
+            camera_controller,
         }
     }
 
@@ -169,9 +197,15 @@ impl State {
     }
 
     fn create_shader(device: &Device) -> wgpu::ShaderModule {
+        let mut file = File::open("./shaders/shader.wgsl").unwrap();
+        let mut shader_str = String::new();
+        file.read_to_string(&mut shader_str).unwrap();
+
         device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/shader.wgsl").into()),
+            //source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/shader.wgsl").into()),
+            //source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/panoramic_shader.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(shader_str.into()),
         })
     }
 
@@ -180,12 +214,16 @@ impl State {
         shader: &wgpu::ShaderModule, 
         config: &wgpu::SurfaceConfiguration,
         texture_bind_group_layout: &wgpu::BindGroupLayout,
+        camera_bind_group_layout: &wgpu::BindGroupLayout,
         ) -> wgpu::RenderPipeline {
 
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
-                bind_group_layouts: &[&texture_bind_group_layout],
+                bind_group_layouts: &[
+                    &texture_bind_group_layout,
+                    &camera_bind_group_layout,
+                ],
                 push_constant_ranges: &[],
             });
 
@@ -293,8 +331,8 @@ impl State {
         // let wgpu define it.
         let diffuse_texture_view = diffuse_texture.create_view(&wgpu::TextureViewDescriptor::default());
         let diffuse_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_u: wgpu::AddressMode::Repeat,
+            address_mode_v: wgpu::AddressMode::MirrorRepeat,
             address_mode_w: wgpu::AddressMode::ClampToEdge,
             mag_filter: wgpu::FilterMode::Linear,
             min_filter: wgpu::FilterMode::Nearest,
@@ -348,6 +386,57 @@ impl State {
         (image_data, texture_bind_group_layout, diffuse_bind_group)
     }
 
+    fn create_camera(size: PhysicalSize<u32>, device: &Device) -> (
+        Camera,
+        CameraUniform,
+        wgpu::Buffer,
+        wgpu::BindGroup, 
+        wgpu::BindGroupLayout
+    ) {
+    
+        let camera = Camera::new(size);
+
+        let mut camera_uniform = CameraUniform::new();
+        camera_uniform.update_view_proj(&camera);
+
+        let camera_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Camera Buffer"),
+                contents: bytemuck::cast_slice(&[camera_uniform]),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            }
+        );
+
+        let camera_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }
+            ],
+            label: Some("camera_bind_group_layout"),
+        });
+
+        let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &camera_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: camera_buffer.as_entire_binding(),
+                }
+            ],
+            label: Some("camera_bind_group"),
+        });
+
+        (camera, camera_uniform, camera_buffer, camera_bind_group, camera_bind_group_layout)
+    }
+
     pub fn window(&self) -> &Window {
         &self.window
     }
@@ -361,12 +450,15 @@ impl State {
         self.surface.configure(&self.device, &self.config);
     }
 
-    fn input(&mut self, event: &WindowEvent) -> bool {
-        todo!()
+    pub fn input(&mut self, event: &WindowEvent) -> bool {
+        self.camera_controller.process_events(event)
     }
 
-    fn update(&mut self) {
-        todo!()
+    pub fn update(&mut self) {
+        println!("update screen");
+        self.camera_controller.update_camera(&mut self.camera);
+        self.camera_uniform.update_view_proj(&self.camera);
+        self.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[self.camera_uniform]));
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -402,6 +494,7 @@ impl State {
 
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]); 
+            render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
 
             render_pass.draw(0..self.num_vertices,0..1);
