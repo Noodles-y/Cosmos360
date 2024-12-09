@@ -27,7 +27,7 @@ impl ApplicationHandler for Application {
         let window = event_loop.create_window(WindowAttributes::default()
                 .with_title("My first Rust window")
                 .with_inner_size(winit::dpi::LogicalSize::new(1920.0, 1080.0))
-                .with_fullscreen(Some(Fullscreen::Borderless(None)))
+                //.with_fullscreen(Some(Fullscreen::Borderless(None)))
         ).unwrap();
 
         self.state = Some(State::new(window));

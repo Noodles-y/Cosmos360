@@ -17,6 +17,8 @@ pub struct CameraController {
     is_down_pressed: bool,
     is_left_pressed: bool,
     is_right_pressed: bool,
+    increase_fov: bool,
+    decrease_fov: bool,
 }
 
 impl CameraController {
@@ -27,6 +29,8 @@ impl CameraController {
             is_down_pressed: false,
             is_left_pressed: false,
             is_right_pressed: false,
+            increase_fov: false,
+            decrease_fov: false,
         }
     }
 
@@ -64,6 +68,16 @@ impl CameraController {
                         self.is_right_pressed = is_pressed;
                         true
                     }
+                    KeyCode::KeyJ => {
+                        println!("Increase Fov");
+                        self.increase_fov = is_pressed;
+                        true
+                    }
+                    KeyCode::KeyK => {
+                        println!("Decrease Fov");
+                        self.decrease_fov = is_pressed;
+                        true
+                    }
                     _ => false,
                 }
             }
@@ -92,6 +106,11 @@ impl CameraController {
 
         camera.rotate(angular_delta, radial_delta);
 
+        let delta_fov = 
+            if self.increase_fov {1.0}
+            else if self.decrease_fov {-1.0}
+            else {0.0};
+        camera.change_fov(delta_fov * self.speed);
     }
 }
 

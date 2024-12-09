@@ -40,30 +40,42 @@ impl Camera {
             );
 
         Self {
-            coordinates: PolarCoordinate{angular:0.0,radial:0.0},
+            coordinates: PolarCoordinate{angular:90.0,radial:45.0},
             radial_max_range: 80.0, 
             eye: (0.0, 0.0, 0.0).into(),
             target: (0.0, 0.0, 1.0).into(),
             up: cgmath::Vector3::unit_y(),
             aspect: screen.width as f32 / screen.height as f32,
-            fovx: 60.0,
+            fovx: 142.0,
             znear: 0.1,
             zfar: 100.0,
         }
     }
 
     fn build_view_projection_matrix(&self) -> cgmath::Matrix4<f32> {
+        use cgmath::{Vector3, InnerSpace};
         //let view = cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up);
         //let view = cgmath::Matrix4::look_at_rh(self.target, self.eye, self.up);
 
         let fovx_rad = self.fovx.to_radians();
         let fovy_rad = 2.0 * ((0.5 * fovx_rad).tan() / self.aspect).atan();
         let fovy = fovy_rad.to_degrees();
+        
+        let up = self.target.cross(Vector3::unit_x()).normalize();
 
-        let view = cgmath::Matrix4::look_to_rh(self.eye, self.target, self.up);
+        let view = cgmath::Matrix4::look_to_rh(self.eye, self.target, up);
         let proj = cgmath::perspective(cgmath::Deg(fovy), self.aspect, self.znear, self.zfar);
 
-        return OPENGL_TO_WGPU_MATRIX * proj * view;
+        let view_proj = OPENGL_TO_WGPU_MATRIX * proj * view;
+        
+        println!("current dir : {:?} current up :  {:?}", self.target, up);
+        //println!("current fovx : {} fovy : {}", self.fovx, fovy);
+        //println!("Matrix View : {:?}", view);
+        //println!("Matrix Proj : {:?}", proj);
+        //println!("Matrix VwPj : {:?}", view_proj);
+
+        return view_proj;
+        //return proj * view;
     }
 
     pub fn orientation(&self) -> &PolarCoordinate {
@@ -75,7 +87,7 @@ impl Camera {
     }
 
     pub fn rotate(&mut self, angular_delta: f32, radial_delta: f32) {
-        use cgmath::{InnerSpace, Deg, Matrix3, prelude::EuclideanSpace, Point3};
+        use cgmath::{InnerSpace, Deg, Matrix3, Quaternion, Rotation3, Rotation, Vector3};
 
         self.coordinates.angular += angular_delta;
         self.coordinates.radial += radial_delta;
@@ -87,25 +99,40 @@ impl Camera {
 
 
         //let forward = (self.target - self.eye).normalize();
-        let forward = cgmath::Vector3::unit_z();
 
 
-        //let angle = Deg(angular_delta);
-        let angle = Deg(self.coordinates.angular);
-        let rot_matrix = Matrix3::from_angle_y(angle);
-        //let angular_rotation = Quaternion::from_axis_anglie(self.up, angle);
-        let current_forward = rot_matrix * forward;
-        //self.target = Point3::from_vec(current_forward);
+        //let angular_angle = Deg(self.coordinates.angular);
+        //let rot_matrix = Matrix3::from_angle_y(angle);
+        //let current_forward = rot_matrix * forward;
+        //let angular_rotation = Quaternion::from_axis_angle(Vector3::unit_y(), angular_angle);
+        //let current_forward = angular_rotation.rotate_vector(forward);
+        //let current_forward = rot_matrix * forward;
 
-        let right = current_forward.cross(self.up);
-        let radial_angle = Deg(self.coordinates.radial);
-        let rot_matrix = Matrix3::from_axis_angle(right, radial_angle);
-        let current_forward = rot_matrix * current_forward;
-        //self.target = Point3::from_vec(current_forward);
-        self.target = current_forward;
+        //let right = current_forward.cross(self.up);
+        //let radial_angle = Deg(self.coordinates.radial);
+        //let rot_matrix = Matrix3::from_axis_angle(right, radial_angle);
+        //let current_forward = rot_matrix * current_forward;
+        //let radial_rotation = Quaternion::from_axis_angle(right, radial_angle);
+        //let current_forward = radial_rotation.rotate_vector(current_forward); 
+        //self.target = current_forward;
+
+        let radial_rotation = Quaternion::from_axis_angle(Vector3::unit_x(), Deg(self.coordinates.radial));
+        let angular_rotation = Quaternion::from_axis_angle(Vector3::unit_y(), Deg(self.coordinates.angular));
+        let combined_rotation = angular_rotation * radial_rotation;
+
+        self.target = combined_rotation.rotate_vector(Vector3::unit_z()).normalize();
+
+        //self.target = Vector3::<f32>::new(1.0, -0.5, 0.0).normalize();
+
+        //exemple si on regarde au centre de l'image
+        //self.target = cgmath::Vector3::unit_x();
 
         println!("current coordinates : {:?} target: {:?}", self.coordinates, self.target);
-        println!("current right : {:?}", right);
+        //println!("current right : {:?}", right);
+    }
+
+    pub fn change_fov(&mut self, delta_fov: f32) {
+        self.fovx += delta_fov;
     }
 }
 

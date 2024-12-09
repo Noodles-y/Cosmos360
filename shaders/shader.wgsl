@@ -16,9 +16,9 @@ fn vs_main(
 ) -> VertexOutput {
     var out: VertexOutput;
     //out.tex_coords = model.tex_coords;
-    out.tex_coords = model.position.xy * 0.5 + 0.5;
+    out.tex_coords = vec2<f32>(model.position.x, model.position.y * 0.5) * 0.5 + 0.5;
     //out.clip_position = camera.view_proj * vec4<f32>(model.position.xyz, 1.0); // 2.
-    out.clip_position = vec4<f32>(model.position.xyz, 1.0); 
+    out.clip_position = vec4<f32>(model.position.xy, 0.0, 1.0); 
     return out;
 }
 
@@ -41,6 +41,7 @@ var<uniform> camera: CameraUniform;
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     //var coords = in.tex_coords;
     var coords = in.clip_position.xy;
+    //coords = (camera.view_proj * in.clip_position).xy;
 
     //coords.y -= camera.radial / 180.0;
     //coords.x += camera.angular / 360.0;
@@ -63,7 +64,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     //let uv = coords * ratio - (ratio.x/2.0);
     
 
-    let uv_corrected = vec2<f32>(uv.x, -uv.y); // Inverser Y pour le système d'écran
+    let uv_corrected = vec2<f32>(uv.x, -uv.y * 0.5); // Inverser Y pour le système d'écran
 
     // Générer un rayon directionnel depuis le centre de la sphère
     let direction = normalize(vec3<f32>(uv_corrected, 1.0));
@@ -74,6 +75,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // Convertir le vecteur directionnel en coordonnées sphériques
     let theta = atan2(world_dir.z, world_dir.x); // Azimut
     let phi = asin(world_dir.y);                // Élévation
+    //let theta = acos(world_dir.y);
+    //let phi = atan2(world_dir.z, world_dir.x);
 
     // Convertir les coordonnées sphériques en UV pour échantillonner la texture
     let u = (theta / (2.0 * 3.14159265359)) + 0.5; // Normaliser dans [0, 1]
