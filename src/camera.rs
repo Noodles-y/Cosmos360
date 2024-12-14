@@ -61,14 +61,13 @@ impl Camera {
         let fovy_rad = 2.0 * ((0.5 * fovx_rad).tan() / self.aspect).atan();
         let fovy = fovy_rad.to_degrees();
         
-        let up = self.target.cross(Vector3::unit_x()).normalize();
-
-        let view = cgmath::Matrix4::look_to_rh(self.eye, self.target, up);
+        let view = cgmath::Matrix4::look_to_rh(self.eye, self.target, self.up);
         let proj = cgmath::perspective(cgmath::Deg(fovy), self.aspect, self.znear, self.zfar);
 
         let view_proj = OPENGL_TO_WGPU_MATRIX * proj * view;
+        //let view_proj = proj * view;
         
-        println!("current dir : {:?} current up :  {:?}", self.target, up);
+        println!("current dir : {:?} current up :  {:?}", self.target, self.up);
         //println!("current fovx : {} fovy : {}", self.fovx, fovy);
         //println!("Matrix View : {:?}", view);
         //println!("Matrix Proj : {:?}", proj);
@@ -92,43 +91,30 @@ impl Camera {
         self.coordinates.angular += angular_delta;
         self.coordinates.radial += radial_delta;
 
+        // normalize angular coordinates [0;360]
         if self.coordinates.angular < 0.0 { self.coordinates.angular += 360.0;}
         if self.coordinates.angular > 360.0 { self.coordinates.angular -= 360.0;}
+        // normalize radial coordinates [-max_range;max_range]
         if self.coordinates.radial < -self.radial_max_range { self.coordinates.radial = -self.radial_max_range;}
         if self.coordinates.radial > self.radial_max_range { self.coordinates.radial = self.radial_max_range;}
 
-
-        //let forward = (self.target - self.eye).normalize();
-
-
-        //let angular_angle = Deg(self.coordinates.angular);
-        //let rot_matrix = Matrix3::from_angle_y(angle);
-        //let current_forward = rot_matrix * forward;
-        //let angular_rotation = Quaternion::from_axis_angle(Vector3::unit_y(), angular_angle);
-        //let current_forward = angular_rotation.rotate_vector(forward);
-        //let current_forward = rot_matrix * forward;
-
-        //let right = current_forward.cross(self.up);
-        //let radial_angle = Deg(self.coordinates.radial);
-        //let rot_matrix = Matrix3::from_axis_angle(right, radial_angle);
-        //let current_forward = rot_matrix * current_forward;
-        //let radial_rotation = Quaternion::from_axis_angle(right, radial_angle);
-        //let current_forward = radial_rotation.rotate_vector(current_forward); 
-        //self.target = current_forward;
-
+        let right = Quaternion::from_axis_angle(Vector3::unit_y(), Deg((self.coordinates.angular + 90.0) % 360.0))
+            .rotate_vector(Vector3::unit_z());
+        // compute target vector
         let radial_rotation = Quaternion::from_axis_angle(Vector3::unit_x(), Deg(self.coordinates.radial));
         let angular_rotation = Quaternion::from_axis_angle(Vector3::unit_y(), Deg(self.coordinates.angular));
-        let combined_rotation = angular_rotation * radial_rotation;
+        //let combined_rotation = angular_rotation * radial_rotation;
+        //let combined_rotation = radial_rotation * angular_rotation;
 
-        self.target = combined_rotation.rotate_vector(Vector3::unit_z()).normalize();
+        //self.target = combined_rotation.rotate_vector(Vector3::unit_z()).normalize();
+        self.target = radial_rotation.rotate_vector(Vector3::unit_z()).normalize();
+        self.target = angular_rotation.rotate_vector(self.target).normalize();
 
-        //self.target = Vector3::<f32>::new(1.0, -0.5, 0.0).normalize();
+        // compute up vector
+        self.up = self.target.cross(right).normalize();
 
-        //exemple si on regarde au centre de l'image
-        //self.target = cgmath::Vector3::unit_x();
-
-        println!("current coordinates : {:?} target: {:?}", self.coordinates, self.target);
-        //println!("current right : {:?}", right);
+        println!("current coordinates : {:?} right : {:?}", self.coordinates, right);
+        println!("cross product magnitude : {}", self.target.cross(right).magnitude());
     }
 
     pub fn change_fov(&mut self, delta_fov: f32) {
