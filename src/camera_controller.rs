@@ -89,10 +89,10 @@ impl CameraController {
         let (mut angular_delta, mut radial_delta) = (0.0, 0.0);
 
         if self.is_right_pressed {
-            angular_delta += 1.0;
+            angular_delta -= 1.0;
         }
         if self.is_left_pressed {
-            angular_delta -= 1.0;
+            angular_delta += 1.0;
         }
         if self.is_up_pressed {
             radial_delta += 1.0;

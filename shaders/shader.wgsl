@@ -55,7 +55,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     // Dimensions de l'écran (exemple, à configurer dynamiquement)
     let screen_size = vec2<f32>(1920.0, 1080.0);
-
+    //let screen_size = vec2<f32>(1080.0, 1080);
     // Normaliser les coordonnées du fragment dans [-1, 1]
     let uv = (coords / screen_size) * 2.0 - vec2<f32>(1.0, 1.0);
     //let uv = coords * 2.0 - vec2<f32>(1.0, 1.0);
@@ -82,8 +82,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let u = (theta / (2.0 * 3.14159265359)) + 0.5; // Normaliser dans [0, 1]
     let v = 1.0 - ((phi + (3.14159265359 / 2.0)) / 3.14159265359); // Normaliser dans [0, 1]
 
+    // debug color
+    let color = vec4f(((u*36)%1), (32*v)%1, v, 0);
+    return color;
+
     // Échantillonner la texture équirectangulaire
-    return textureSample(t_diffuse, s_diffuse, vec2<f32>(u, v));
+    //return textureSample(t_diffuse, s_diffuse, vec2<f32>(u, v));
   
     //test
     //let toto = vec2<f32>(world_dir)

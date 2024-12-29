@@ -40,8 +40,8 @@ impl Camera {
             );
 
         Self {
-            coordinates: PolarCoordinate{angular:90.0,radial:45.0},
-            radial_max_range: 80.0, 
+            coordinates: PolarCoordinate{angular:0.0,radial:0.0},
+            radial_max_range: 90.0, 
             eye: (0.0, 0.0, 0.0).into(),
             target: (0.0, 0.0, 1.0).into(),
             up: cgmath::Vector3::unit_y(),
@@ -63,9 +63,9 @@ impl Camera {
         
         let view = cgmath::Matrix4::look_to_rh(self.eye, self.target, self.up);
         let proj = cgmath::perspective(cgmath::Deg(fovy), self.aspect, self.znear, self.zfar);
-
-        let view_proj = OPENGL_TO_WGPU_MATRIX * proj * view;
-        //let view_proj = proj * view;
+        
+        //let view_proj = OPENGL_TO_WGPU_MATRIX * proj * view;
+        let view_proj = OPENGL_TO_WGPU_MATRIX * view;
         
         println!("current dir : {:?} current up :  {:?}", self.target, self.up);
         //println!("current fovx : {} fovy : {}", self.fovx, fovy);
