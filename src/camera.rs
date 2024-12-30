@@ -52,20 +52,27 @@ impl Camera {
         }
     }
 
+    fn fovx_to_fovy(fovx: f32, aspect: f32) -> f32 {
+        let fovx_rad = fovx.to_radians();
+        let fovy_rad = 2.0 * ((0.5 * fovx_rad).tan() / aspect).atan();
+        fovy_rad.to_degrees()
+    }
+
     fn build_view_projection_matrix(&self) -> cgmath::Matrix4<f32> {
         use cgmath::{Vector3, InnerSpace};
         //let view = cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up);
         //let view = cgmath::Matrix4::look_at_rh(self.target, self.eye, self.up);
 
-        let fovx_rad = self.fovx.to_radians();
-        let fovy_rad = 2.0 * ((0.5 * fovx_rad).tan() / self.aspect).atan();
-        let fovy = fovy_rad.to_degrees();
-        
+        //let fovx_rad = self.fovx.to_radians();
+        //let fovy_rad = 2.0 * ((0.5 * fovx_rad).tan() / self.aspect).atan();
+        //let fovy = fovy_rad.to_degrees();
+        let fovy = Self::fovx_to_fovy(self.fovx, self.aspect);
+
         let view = cgmath::Matrix4::look_to_rh(self.eye, self.target, self.up);
         let proj = cgmath::perspective(cgmath::Deg(fovy), self.aspect, self.znear, self.zfar);
         
-        //let view_proj = OPENGL_TO_WGPU_MATRIX * proj * view;
-        let view_proj = OPENGL_TO_WGPU_MATRIX * view;
+        let view_proj = OPENGL_TO_WGPU_MATRIX * proj * view;
+        //let view_proj = OPENGL_TO_WGPU_MATRIX * view;
         
         println!("current dir : {:?} current up :  {:?}", self.target, self.up);
         //println!("current fovx : {} fovy : {}", self.fovx, fovy);
@@ -118,7 +125,17 @@ impl Camera {
     }
 
     pub fn change_fov(&mut self, delta_fov: f32) {
-        self.fovx += delta_fov;
+        let new_fovy = Self::fovx_to_fovy(self.fovx+delta_fov, self.aspect); 
+
+        if new_fovy > 0.0 && new_fovy < 360.0 {
+            self.fovx += delta_fov;
+        }
+
+        println!("current fovx = {} fovy = {}, new_fovy = {}", 
+            self.fovx, 
+            Self::fovx_to_fovy(self.fovx, self.aspect),
+            new_fovy,
+            );
     }
 }
 
