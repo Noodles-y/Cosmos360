@@ -5,7 +5,7 @@ mod camera;
 mod camera_controller;
 
 use application::Application;
-use winit::event_loop::{EventLoop, ControlFlow};
+use winit::event_loop::{EventLoop,};
 
 pub fn main() {
 

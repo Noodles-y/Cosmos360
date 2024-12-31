@@ -1,12 +1,11 @@
 use image::{
     ImageReader,
-    DynamicImage,
     GenericImageView,
     RgbaImage,
 };
 
 pub struct ImageData {
-    image: DynamicImage,
+    //image: DynamicImage,
     diffuse_rgba: RgbaImage,
     dimensions: (u32, u32),
 }
@@ -24,7 +23,6 @@ impl ImageData {
         let dimensions = image.dimensions();
 
         Self{
-            image,
             diffuse_rgba,
             dimensions,
         }    

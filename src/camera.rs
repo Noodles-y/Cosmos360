@@ -59,7 +59,7 @@ impl Camera {
     }
 
     fn build_view_projection_matrix(&self) -> cgmath::Matrix4<f32> {
-        use cgmath::{Vector3, InnerSpace};
+        //use cgmath::{Vector3, InnerSpace};
         //let view = cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up);
         //let view = cgmath::Matrix4::look_at_rh(self.target, self.eye, self.up);
 
@@ -88,12 +88,8 @@ impl Camera {
         &self.coordinates
     }
 
-    pub fn set_orientation(&mut self, r: u32, a: u32) {
-        todo!()
-    }
-
     pub fn rotate(&mut self, angular_delta: f32, radial_delta: f32) {
-        use cgmath::{InnerSpace, Deg, Matrix3, Quaternion, Rotation3, Rotation, Vector3};
+        use cgmath::{InnerSpace, Deg, Quaternion, Rotation3, Rotation, Vector3};
 
         self.coordinates.angular += angular_delta;
         self.coordinates.radial += radial_delta;

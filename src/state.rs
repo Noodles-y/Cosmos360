@@ -441,7 +441,7 @@ impl State {
         &self.window
     }
 
-    pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
+    pub fn _resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         self.size = new_size;
 
         self.config.width = new_size.width;
