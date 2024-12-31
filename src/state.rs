@@ -64,13 +64,13 @@ pub struct State {
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
     queue: wgpu::Queue,
-    config: wgpu::SurfaceConfiguration,
-    size: winit::dpi::PhysicalSize<u32>,
+    _config: wgpu::SurfaceConfiguration,
+    _size: winit::dpi::PhysicalSize<u32>,
     render_pipeline: wgpu::RenderPipeline,
     window: Arc<Window>,
     vertex_buffer: wgpu::Buffer,
     num_vertices: u32,
-    image_data: ImageData,
+    _image_data: ImageData,
     diffuse_bind_group: wgpu::BindGroup,
     camera: Camera,
     camera_uniform: CameraUniform,
@@ -125,12 +125,12 @@ impl State {
             surface,
             device,
             queue,
-            config,
-            size,
+            _config: config,
+            _size: size,
             render_pipeline,
             vertex_buffer,
             num_vertices,
-            image_data,
+            _image_data: image_data,
             diffuse_bind_group,
             camera,
             camera_uniform,
@@ -442,12 +442,12 @@ impl State {
     }
 
     pub fn _resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
-        self.size = new_size;
+        self._size = new_size;
 
-        self.config.width = new_size.width;
-        self.config.height = new_size.height;
+        self._config.width = new_size.width;
+        self._config.height = new_size.height;
 
-        self.surface.configure(&self.device, &self.config);
+        self.surface.configure(&self.device, &self._config);
     }
 
     pub fn input(&mut self, event: &WindowEvent) -> bool {
