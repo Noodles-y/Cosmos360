@@ -1,8 +1,8 @@
-use cgmath;
+use cgmath::{Point3, Matrix4, Vector3, InnerSpace, Quaternion, Rotation, Rotation3, Deg};
 use winit::dpi::PhysicalSize;
 
 #[rustfmt::skip]
-pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
+pub const OPENGL_TO_WGPU_MATRIX: Matrix4<f32> = Matrix4::new(
     1.0, 0.0, 0.0, 0.0,
     0.0, 1.0, 0.0, 0.0,
     0.0, 0.0, 0.5, 0.5,
@@ -19,10 +19,10 @@ pub struct PolarCoordinate {
 pub struct Camera {
     coordinates: PolarCoordinate,
     radial_max_range: f32,
-    pub eye: cgmath::Point3<f32>,
+    pub eye: Point3<f32>,
     //pub target: cgmath::Point3<f32>,
-    pub target: cgmath::Vector3<f32>,
-    pub up: cgmath::Vector3<f32>,
+    pub target: Vector3<f32>,
+    pub up: Vector3<f32>,
     aspect: f32,
     fovx: f32,
     znear: f32,
@@ -33,12 +33,12 @@ impl Camera {
 
     pub fn new(screen: PhysicalSize<u32>) -> Self {
 
-        println!("Aspect ratio : {} / {} = {}",
+        /*println!("Aspect ratio : {} / {} = {}",
             screen.width as f32,
             screen.height as f32,
             screen.width as f32 / screen.height as f32
             );
-
+*/
         Self {
             coordinates: PolarCoordinate{angular:0.0,radial:0.0},
             radial_max_range: 90.0, 
@@ -52,10 +52,24 @@ impl Camera {
         }
     }
 
+    fn display_matrix(name: &str, matrix: Matrix4<f32>) {
+        println!("{} :", name);
+        println!("{:5.2} {:5.2} {:5.2} {:5.2}", matrix.x.x, matrix.x.y, matrix.x.z, matrix.x.w);
+        println!("{:5.2} {:5.2} {:5.2} {:5.2}", matrix.y.x, matrix.y.y, matrix.y.z, matrix.y.w);
+        println!("{:5.2} {:5.2} {:5.2} {:5.2}", matrix.z.x, matrix.z.y, matrix.z.z, matrix.z.w);
+        println!("{:5.2} {:5.2} {:5.2} {:5.2}", matrix.w.x, matrix.w.y, matrix.w.z, matrix.w.w);
+    }
+
     fn fovx_to_fovy(fovx: f32, aspect: f32) -> f32 {
         let fovx_rad = fovx.to_radians();
         let fovy_rad = 2.0 * ((0.5 * fovx_rad).tan() / aspect).atan();
         fovy_rad.to_degrees()
+    }
+
+    pub fn get_view_matrix(&self) -> cgmath::Matrix4<f32> {
+        let view = cgmath::Matrix4::look_to_lh(self.eye, self.target, self.up);
+        Self::display_matrix("view", view);
+        view
     }
 
     fn build_view_projection_matrix(&self) -> cgmath::Matrix4<f32> {
@@ -68,13 +82,28 @@ impl Camera {
         //let fovy = fovy_rad.to_degrees();
         let fovy = Self::fovx_to_fovy(self.fovx, self.aspect);
 
-        let view = cgmath::Matrix4::look_to_rh(self.eye, self.target, self.up);
-        let proj = cgmath::perspective(cgmath::Deg(fovy), self.aspect, self.znear, self.zfar);
+        // test
+        let target = self.target;
+        let up = self.up;
+        //let target = -Vector3::unit_y();
+        //let up = -Vector3::unit_x();
+
+        let view = cgmath::Matrix4::look_to_lh(self.eye, target, up);
+        //let view = cgmath::Matrix4::look_to_rh(self.eye, -Vector3::unit_y(), -Vector3::unit_z());
+        Self::display_matrix("east-down target", cgmath::Matrix4::look_to_lh(self.eye, -Vector3::unit_y(), -Vector3::unit_z()));
         
+        let proj = cgmath::perspective(Deg(fovy), self.aspect, self.znear, self.zfar);
+        
+        Self::display_matrix("view", view);
+
         let view_proj = OPENGL_TO_WGPU_MATRIX * proj * view;
         //let view_proj = OPENGL_TO_WGPU_MATRIX * view;
         
-        println!("current dir : {:?} current up :  {:?}", self.target, self.up);
+        println!("coordinates : angular = {:.0} radial = {:.0} ", self.coordinates.angular, self.coordinates.radial);
+        println!("target : [{:.2}, {:.2}, {:.2}] up :  [{:.2}, {:.2}, {:.2}]",
+            self.target.x, self.target.y, self.target.z,
+            self.up.x, self.up.y, self.up.z,
+            );
         //println!("current fovx : {} fovy : {}", self.fovx, fovy);
         //println!("Matrix View : {:?}", view);
         //println!("Matrix Proj : {:?}", proj);
@@ -89,35 +118,34 @@ impl Camera {
     }
 
     pub fn rotate(&mut self, angular_delta: f32, radial_delta: f32) {
-        use cgmath::{InnerSpace, Deg, Quaternion, Rotation3, Rotation, Vector3};
+        //use cgmath::{InnerSpace, Deg, Quaternion, Rotation3, Rotation, Vector3};
 
         self.coordinates.angular += angular_delta;
         self.coordinates.radial += radial_delta;
 
         // normalize angular coordinates [0;360]
-        if self.coordinates.angular < 0.0 { self.coordinates.angular += 360.0;}
-        if self.coordinates.angular > 360.0 { self.coordinates.angular -= 360.0;}
+        self.coordinates.angular = (self.coordinates.angular % 360.0 + 360.0) % 360.0;
         // normalize radial coordinates [-max_range;max_range]
-        if self.coordinates.radial < -self.radial_max_range { self.coordinates.radial = -self.radial_max_range;}
-        if self.coordinates.radial > self.radial_max_range { self.coordinates.radial = self.radial_max_range;}
+        self.coordinates.radial = self.coordinates.radial.clamp(-self.radial_max_range, self.radial_max_range);
+        
+        //self.target = Self::compute_target(self.coordinates.angular, self.coordinates.radial);
+        //self.up = Self::compute_up(self.target, self.coordinates.angular);
 
+        
         let right = Quaternion::from_axis_angle(Vector3::unit_y(), Deg((self.coordinates.angular + 90.0) % 360.0))
             .rotate_vector(Vector3::unit_z());
         // compute target vector
         let radial_rotation = Quaternion::from_axis_angle(Vector3::unit_x(), Deg(self.coordinates.radial));
         let angular_rotation = Quaternion::from_axis_angle(Vector3::unit_y(), Deg(self.coordinates.angular));
-        //let combined_rotation = angular_rotation * radial_rotation;
-        //let combined_rotation = radial_rotation * angular_rotation;
 
-        //self.target = combined_rotation.rotate_vector(Vector3::unit_z()).normalize();
         self.target = radial_rotation.rotate_vector(Vector3::unit_z()).normalize();
         self.target = angular_rotation.rotate_vector(self.target).normalize();
 
         // compute up vector
         self.up = self.target.cross(right).normalize();
-
-        println!("current coordinates : {:?} right : {:?}", self.coordinates, right);
-        println!("cross product magnitude : {}", self.target.cross(right).magnitude());
+        
+        //println!("current coordinates : {:?} right : {:?}", self.coordinates, right);
+        //println!("cross product magnitude : {}", self.target.cross(right).magnitude());
     }
 
     pub fn change_fov(&mut self, delta_fov: f32) {
@@ -127,11 +155,11 @@ impl Camera {
             self.fovx += delta_fov;
         }
 
-        println!("current fovx = {} fovy = {}, new_fovy = {}", 
+        /*println!("current fovx = {} fovy = {}, new_fovy = {}", 
             self.fovx, 
             Self::fovx_to_fovy(self.fovx, self.aspect),
             new_fovy,
-            );
+            );*/
     }
 }
 
@@ -164,3 +192,208 @@ impl CameraUniform {
     }
 }
 
+// *** Tests ***
+
+fn spheric_to_equirectangular(longitude: f32, latitude: f32) -> cgmath::Point2<f32> {
+    // center of the map (longitude, latitude)
+    let origin = cgmath::Point2::<f32>::new(0.0, 0.0);
+    let x = (origin.y.to_radians().cos() * (longitude - origin.x))/360.0;
+    let y = (latitude - origin.y)/180.0;
+
+    println!("spheric to equirectangular : longitude = {:.0} latitude: {:.0}", longitude, latitude);
+    println!("X = ( cos({:.1} PI) * ({:.0} - {:.0}) ) / 360", origin.y.to_radians()/3.141592, longitude, origin.x);
+    println!("Y = ({} - {} ) / 180", latitude, origin.y);
+    println!("X = {:.2} Y = {:.2}", x, y);
+
+    cgmath::Point2::<f32>::new(x, y)
+}
+
+fn spheric_to_cartesian(azimuth_deg: f32, elevation_deg: f32) -> cgmath::Point2<f32> {
+    use cgmath::Point2;
+
+    let azimuth_rad = azimuth_deg.to_radians();
+    let elevation_rad = elevation_deg.to_radians();
+    let mut result = Point2::new(0.0, 0.0);
+
+    result.x = elevation_rad.sin() * azimuth_rad.cos();
+    result.y = elevation_rad.cos();
+
+    println!("spheric_to_cartesian : azimuth = {}° ({:.1} PI rad) elevation = {}° ({:.1} PI rad)",
+        azimuth_deg,
+        azimuth_rad / 3.141592,
+        elevation_deg,
+        elevation_rad / 3.141592,
+        );
+    //println!("sin(azimuth) = {:.2} cos(azimuth) = {:.2} sin(elevation) = {:.2} cos(elevation) = {:.2}",
+    //    elevation_rad.sin(), azimuth_rad.cos(), elevation_rad.sin(), elevation_rad.cos());
+    println!("X = sin({:.2}) x cos({:.2}) Y = cos({:.2}))"
+        , elevation_rad, azimuth_rad
+        , elevation_rad
+        );
+    println!("X = {:.2} x {:.2} Y = {:.2}"
+        , elevation_rad.sin(), azimuth_rad.cos()
+        , elevation_rad.cos()
+        );
+    println!("X = {:.2} Y = {:.2}", result.x, result.y);
+
+    result
+}
+
+#[cfg(test)]
+mod test_rotation {
+    use super::*;
+    use cgmath::{Vector3, Vector4};
+
+    fn compare_f32(a: f32, b:f32) -> bool {
+        let float_precision = 0.001;
+
+        println!("{} == {}", a, b);
+
+        (a - b).abs() < float_precision
+    }
+
+    fn compare_vector3(u: Vector3<f32>, v: Vector3<f32>) -> bool {
+        println!("[{:.2}, {:.2}, {:.2}] == [{:.2}, {:.2}, {:.2}]",
+            u.x, u.y, u.z,
+            v.x, v.y, v.z);
+
+        compare_f32(u.x, v.x) && compare_f32(u.y, v.y) && compare_f32(u.z, v.z)
+    }
+
+    fn camera_rotation(azimuth: f32, elevation: f32) -> Vector3<f32> {
+        let mut camera = Camera::new(PhysicalSize::new(1920, 1080));
+        camera.rotate(azimuth, elevation);
+        println!("camera.target = [{:.2}, {:.2}, {:.2}] camera.up = [{:.2}, {:.2}, {:.2}]",
+            camera.target.x, camera.target.y, camera.target.z,
+            camera.up.x, camera.up.y, camera.up.z,
+        );
+        let view = camera.get_view_matrix();
+        let target: Vector3<f32> = (view * Vector4::unit_z()).truncate();
+        target
+    }
+
+    #[test]
+    fn azimuth_0_elevation_90() {
+        let target = camera_rotation(0.0, 0.0); 
+        println!("target = [{:.2}, {:.2}, {:.2}]", target.x, target.y, target.z);
+        assert!(compare_vector3(target, Vector3::<f32>::new(0.0, 0.0, 1.0)));
+    }
+
+    #[test]
+    fn azimuth_90_elevation_90() {
+        let target = camera_rotation(90.0, 0.0); 
+        println!("target = [{:.2}, {:.2}, {:.2}]", target.x, target.y, target.z);
+        assert!(compare_vector3(target, Vector3::<f32>::new(-1.0, 0.0, 0.0)));
+    }
+    
+    #[test]
+    fn azimuth_180_elevation_90() {
+        let target = camera_rotation(180.0, 0.0); 
+        println!("target = [{:.2}, {:.2}, {:.2}]", target.x, target.y, target.z);
+        assert!(compare_vector3(target, Vector3::<f32>::new(0.0, 0.0, -1.0)));
+    }
+
+    #[test]
+    fn azimuth_270_elevation_90() {
+        let target = camera_rotation(270.0, 0.0); 
+        println!("target = [{:.2}, {:.2}, {:.2}]", target.x, target.y, target.z);
+        assert!(compare_vector3(target, Vector3::<f32>::new(1.0, 0.0, 0.0)));
+    }
+
+    #[test]
+    fn azimuth_0_elevation_0() {
+        let target = camera_rotation(0.0, 90.0); 
+        println!("target = [{:.2}, {:.2}, {:.2}]", target.x, target.y, target.z);
+        assert!(compare_vector3(target, Vector3::<f32>::new(0.0, 1.0, 0.0)));
+    }
+
+    #[test]
+    fn azimuth_90_elevation_0() {
+        let target = camera_rotation(90.0, 90.0); 
+        println!("target = [{:.2}, {:.2}, {:.2}]", target.x, target.y, target.z);
+        assert!(compare_vector3(target, Vector3::<f32>::new(0.0, 1.0, 0.0)));
+    }
+
+    #[test]
+    fn azimuth_180_elevation_0() {
+        let target = camera_rotation(180.0, 90.0); 
+        println!("target = [{:.2}, {:.2}, {:.2}]", target.x, target.y, target.z);
+        assert!(compare_vector3(target, Vector3::<f32>::new(0.0, 1.0, 0.0)));
+    }
+
+    #[test]
+    fn azimuth_270_elevation_0() {
+        let target = camera_rotation(270.0, 90.0); 
+        println!("target = [{:.2}, {:.2}, {:.2}]", target.x, target.y, target.z);
+        assert!(compare_vector3(target, Vector3::<f32>::new(0.0, 1.0, 0.0)));
+    }
+
+}
+
+#[cfg(test)]
+mod test_spheric_to_equirectangular {
+    use super::*;
+
+    fn compare(a: f32, b:f32) -> bool {
+        let float_precision = 0.001;
+
+        (a - b).abs() < float_precision
+    }
+
+    #[test]
+    fn azimuth_0_elevation_0() {
+        let result = spheric_to_equirectangular(0.0, 0.0); 
+        assert!(compare(result.x, 0.0));
+        assert!(compare(result.y, 0.0));
+    }
+    
+    #[test]
+    fn azimuth_0_elevation_90() {
+        let result = spheric_to_equirectangular(0.0, 90.0); 
+        assert!(compare(result.x, 0.0));
+        assert!(compare(result.y, 0.5));
+    }
+
+    #[test]
+    fn azimuth_0_elevation_180() {
+        let result = spheric_to_equirectangular(0.0, 180.0); 
+        assert!(compare(result.x, 0.0));
+        assert!(compare(result.y, 1.0));
+    }
+
+    #[test]
+    fn azimuth_90_elevation_90() {
+        let result = spheric_to_equirectangular(90.0, 90.0); 
+        assert!(compare(result.x, 0.25));
+        assert!(compare(result.y, 0.5));
+    }
+    
+    #[test]
+    fn azimuth_180_elevation_90() {
+        let result = spheric_to_equirectangular(180.0, 90.0); 
+        assert!(compare(result.x, 0.5));
+        assert!(compare(result.y, 0.5));
+    }
+    
+    #[test]
+    fn azimuth_270_elevation_90() {
+        let result = spheric_to_equirectangular(270.0, 90.0); 
+        assert!(compare(result.x, 0.75));
+        assert!(compare(result.y, 0.5));
+    }
+    
+    #[test]
+    fn azimuth_360_elevation_90() {
+        let result = spheric_to_equirectangular(360.0, 90.0); 
+        assert!(compare(result.x, 1.0));
+        assert!(compare(result.y, 0.5));
+    }
+    
+    #[test]
+    fn azimuth_180_elevation_0() {
+        let result = spheric_to_equirectangular(180.0, 0.0); 
+        assert!(compare(result.x, 0.5));
+        assert!(compare(result.y, 0.0));
+    }
+    
+}
