@@ -143,9 +143,33 @@ impl Camera {
 
         // compute up vector
         self.up = self.target.cross(right).normalize();
+    }
+
+    fn move_coordinates(&mut self, angular_delta: f32, radial_delta: f32) {
+        self.coordinates.angular += angular_delta;
+        self.coordinates.radial += radial_delta;
+
+        // normalize angular coordinates [0;360]
+        self.coordinates.angular = (self.coordinates.angular % 360.0 + 360.0) % 360.0;
+        // normalize radial coordinates [-max_range;max_range]
+        self.coordinates.radial = self.coordinates.radial.clamp(-self.radial_max_range, self.radial_max_range);
+    }
+
+    pub fn rotate_vector(vector: Vector3<f32>, azimuth: f32, elevation: f32) -> Vector3<f32> {
+        let mut rotated_vector = vector;
+        rotated_vector = Quaternion::from_axis_angle(Vector3::unit_x(), Deg(elevation))
+            .rotate_vector(rotated_vector);
+        rotated_vector = Quaternion::from_axis_angle(Vector3::unit_y(), Deg(azimuth))
+            .rotate_vector(rotated_vector);
+        rotated_vector
+    }
+
+    pub fn rotate2(&mut self, azimuth_delta: f32, elevation_delta: f32) {
+        self.move_coordinates(azimuth_delta, elevation_delta);
         
-        //println!("current coordinates : {:?} right : {:?}", self.coordinates, right);
-        //println!("cross product magnitude : {}", self.target.cross(right).magnitude());
+        self.target = Self::rotate_vector(Vector3::unit_y(), self.coordinates.angular, self.coordinates.radial);
+        self.up = Self::rotate_vector(-Vector3::unit_z(), self.coordinates.angular, self.coordinates.radial);
+
     }
 
     pub fn change_fov(&mut self, delta_fov: f32) {
@@ -262,7 +286,7 @@ mod test_rotation {
 
     fn camera_rotation(azimuth: f32, elevation: f32) -> Vector3<f32> {
         let mut camera = Camera::new(PhysicalSize::new(1920, 1080));
-        camera.rotate(azimuth, elevation);
+        camera.rotate2(azimuth, elevation);
         println!("camera.target = [{:.2}, {:.2}, {:.2}] camera.up = [{:.2}, {:.2}, {:.2}]",
             camera.target.x, camera.target.y, camera.target.z,
             camera.up.x, camera.up.y, camera.up.z,
@@ -273,57 +297,85 @@ mod test_rotation {
     }
 
     #[test]
+    fn vector_rotation() {
+        assert!(compare_vector3(Camera::rotate_vector(Vector3::unit_y(), 0.0, 0.0), Vector3::unit_y()));
+        assert!(compare_vector3(Camera::rotate_vector(Vector3::unit_y(), 90.0, 0.0), Vector3::unit_y()));
+        assert!(compare_vector3(Camera::rotate_vector(Vector3::unit_y(), 180.0, 0.0), Vector3::unit_y()));
+        assert!(compare_vector3(Camera::rotate_vector(Vector3::unit_y(), 270.0, 0.0), Vector3::unit_y()));
+        
+        assert!(compare_vector3(Camera::rotate_vector(Vector3::unit_y(), 0.0, 90.0), Vector3::unit_z()));
+        assert!(compare_vector3(Camera::rotate_vector(Vector3::unit_y(), 90.0, 90.0), Vector3::unit_x()));
+        assert!(compare_vector3(Camera::rotate_vector(Vector3::unit_y(), 180.0, 90.0), -Vector3::unit_z()));
+        assert!(compare_vector3(Camera::rotate_vector(Vector3::unit_y(), 270.0, 90.0), -Vector3::unit_x()));
+
+        assert!(compare_vector3(Camera::rotate_vector(Vector3::unit_y(), 0.0, 180.0), -Vector3::unit_y()));
+        assert!(compare_vector3(Camera::rotate_vector(Vector3::unit_y(), 90.0, 180.0), -Vector3::unit_y()));
+        assert!(compare_vector3(Camera::rotate_vector(Vector3::unit_y(), 180.0, 180.0), -Vector3::unit_y()));
+        assert!(compare_vector3(Camera::rotate_vector(Vector3::unit_y(), 270.0, 180.0), -Vector3::unit_y()));
+
+        assert!(compare_vector3(Camera::rotate_vector(Vector3::unit_z(), 0.0, 0.0), Vector3::unit_z()));
+        assert!(compare_vector3(Camera::rotate_vector(Vector3::unit_z(), 90.0, 0.0), Vector3::unit_x()));
+        assert!(compare_vector3(Camera::rotate_vector(Vector3::unit_z(), 180.0, 0.0), -Vector3::unit_z()));
+        assert!(compare_vector3(Camera::rotate_vector(Vector3::unit_z(), 270.0, 0.0), -Vector3::unit_x()));
+        
+        assert!(compare_vector3(Camera::rotate_vector(Vector3::unit_z(), 0.0, 90.0), -Vector3::unit_y()));
+        assert!(compare_vector3(Camera::rotate_vector(Vector3::unit_z(), 90.0, 90.0), -Vector3::unit_y()));
+        assert!(compare_vector3(Camera::rotate_vector(Vector3::unit_z(), 180.0, 90.0), -Vector3::unit_y()));
+        assert!(compare_vector3(Camera::rotate_vector(Vector3::unit_z(), 270.0, 90.0), -Vector3::unit_y()));
+    }
+
+    #[test]
     fn azimuth_0_elevation_90() {
-        let target = camera_rotation(0.0, 0.0); 
+        let target = camera_rotation(0.0, 90.0); 
         println!("target = [{:.2}, {:.2}, {:.2}]", target.x, target.y, target.z);
         assert!(compare_vector3(target, Vector3::<f32>::new(0.0, 0.0, 1.0)));
     }
 
     #[test]
     fn azimuth_90_elevation_90() {
-        let target = camera_rotation(90.0, 0.0); 
+        let target = camera_rotation(90.0, 90.0); 
         println!("target = [{:.2}, {:.2}, {:.2}]", target.x, target.y, target.z);
         assert!(compare_vector3(target, Vector3::<f32>::new(-1.0, 0.0, 0.0)));
     }
     
     #[test]
     fn azimuth_180_elevation_90() {
-        let target = camera_rotation(180.0, 0.0); 
+        let target = camera_rotation(180.0, 90.0); 
         println!("target = [{:.2}, {:.2}, {:.2}]", target.x, target.y, target.z);
         assert!(compare_vector3(target, Vector3::<f32>::new(0.0, 0.0, -1.0)));
     }
 
     #[test]
     fn azimuth_270_elevation_90() {
-        let target = camera_rotation(270.0, 0.0); 
+        let target = camera_rotation(270.0, 90.0); 
         println!("target = [{:.2}, {:.2}, {:.2}]", target.x, target.y, target.z);
         assert!(compare_vector3(target, Vector3::<f32>::new(1.0, 0.0, 0.0)));
     }
 
     #[test]
     fn azimuth_0_elevation_0() {
-        let target = camera_rotation(0.0, 90.0); 
+        let target = camera_rotation(0.0, 0.0); 
         println!("target = [{:.2}, {:.2}, {:.2}]", target.x, target.y, target.z);
         assert!(compare_vector3(target, Vector3::<f32>::new(0.0, 1.0, 0.0)));
     }
 
     #[test]
     fn azimuth_90_elevation_0() {
-        let target = camera_rotation(90.0, 90.0); 
+        let target = camera_rotation(90.0, 0.0); 
         println!("target = [{:.2}, {:.2}, {:.2}]", target.x, target.y, target.z);
         assert!(compare_vector3(target, Vector3::<f32>::new(0.0, 1.0, 0.0)));
     }
 
     #[test]
     fn azimuth_180_elevation_0() {
-        let target = camera_rotation(180.0, 90.0); 
+        let target = camera_rotation(180.0, 0.0); 
         println!("target = [{:.2}, {:.2}, {:.2}]", target.x, target.y, target.z);
         assert!(compare_vector3(target, Vector3::<f32>::new(0.0, 1.0, 0.0)));
     }
 
     #[test]
     fn azimuth_270_elevation_0() {
-        let target = camera_rotation(270.0, 90.0); 
+        let target = camera_rotation(270.0, 0.0); 
         println!("target = [{:.2}, {:.2}, {:.2}]", target.x, target.y, target.z);
         assert!(compare_vector3(target, Vector3::<f32>::new(0.0, 1.0, 0.0)));
     }
