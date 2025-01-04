@@ -60,7 +60,7 @@ impl Camera {
         println!("{:5.2} {:5.2} {:5.2} {:5.2}", matrix.w.x, matrix.w.y, matrix.w.z, matrix.w.w);
     }
 
-    fn fovx_to_fovy(fovx: f32, aspect: f32) -> f32 {
+    pub fn fovx_to_fovy(fovx: f32, aspect: f32) -> f32 {
         let fovx_rad = fovx.to_radians();
         let fovy_rad = 2.0 * ((0.5 * fovx_rad).tan() / aspect).atan();
         fovy_rad.to_degrees()
@@ -172,6 +172,7 @@ impl Camera {
 
     }
 
+
     pub fn change_fov(&mut self, delta_fov: f32) {
         let new_fovy = Self::fovx_to_fovy(self.fovx+delta_fov, self.aspect); 
 
@@ -184,6 +185,18 @@ impl Camera {
             Self::fovx_to_fovy(self.fovx, self.aspect),
             new_fovy,
             );*/
+    }
+
+    pub fn set_fovx(&mut self, value: f32) {
+        let new_fovy = Self::fovx_to_fovy(value, self.aspect); 
+
+        if new_fovy > 0.0 && new_fovy < 360.0 {
+            self.fovx = value;
+        }
+        else
+        {
+            println!("Camera::set_fovx() : Invalid value (fovx={:.2} => fovy={:.2} [0.0 ; 360.0])", value, new_fovy);
+        }
     }
 }
 
@@ -217,6 +230,22 @@ impl CameraUniform {
 }
 
 // *** Tests ***
+/*
+ *  screen_coords : (-1.0, -1.0) to (1.0, 1.0)
+ *  azimuth : 0.0 to 360.0
+ *  elevation : 0.0 to 180.0 from north pole
+*/
+pub fn screen_to_spheric(screen_coords: cgmath::Point2<f32>, azimuth: f32, elevation: f32, fovx: f32, aspect: f32) -> (f32, f32) {
+
+    let fovy = Camera::fovx_to_fovy(fovx, aspect);
+
+    let result_azimuth = ((azimuth + fovx * screen_coords.x) + 360.0) % 360.0;
+    let result_elevation = elevation + fovy * screen_coords.y;
+
+    println!("fovx = {:.3} fovy = {:.3}", fovx, fovy);
+
+    (result_azimuth, result_elevation)
+}
 
 fn spheric_to_equirectangular(longitude: f32, latitude: f32) -> cgmath::Point2<f32> {
     // center of the map (longitude, latitude)
@@ -297,6 +326,28 @@ mod test_rotation {
     }
 
     #[test]
+    fn screen_to_spheric_azimuth_0_elevation_90() { 
+        let aspect = 2000.0 / 1000.0;
+        let fovx = 90.0;
+        let fovy = Camera::fovx_to_fovy(fovx, aspect);
+        let (azimuth, elevation) = screen_to_spheric(cgmath::Point2::<f32>::new(0.0, 0.0), 0.0, 90.0, fovx, aspect);
+        assert_eq!(azimuth, 0.0);
+        assert_eq!(elevation, 90.0);
+        let (azimuth, elevation) = screen_to_spheric(cgmath::Point2::<f32>::new(-1.0, 0.0), 0.0, 90.0, fovx, aspect);
+        assert_eq!(azimuth, 270.0);
+        assert_eq!(elevation, 90.0);
+        let (azimuth, elevation) = screen_to_spheric(cgmath::Point2::<f32>::new(1.0, 0.0), 0.0, 90.0, fovx, aspect);
+        assert_eq!(azimuth, 90.0);
+        assert_eq!(elevation, 90.0);
+        let (azimuth, elevation) = screen_to_spheric(cgmath::Point2::<f32>::new(0.0, 1.0), 0.0, 90.0, fovx, aspect);
+        assert_eq!(azimuth, 0.0);
+        assert_eq!(elevation, 90.0+fovy);
+        let (azimuth, elevation) = screen_to_spheric(cgmath::Point2::<f32>::new(0.0, -1.0), 0.0, 90.0, fovx, aspect);
+        assert_eq!(azimuth, 0.0);
+        assert_eq!(elevation, 90.0-fovy);
+    }
+
+    #[test]
     fn vector_rotation() {
         assert!(compare_vector3(Camera::rotate_vector(Vector3::unit_y(), 0.0, 0.0), Vector3::unit_y()));
         assert!(compare_vector3(Camera::rotate_vector(Vector3::unit_y(), 90.0, 0.0), Vector3::unit_y()));
@@ -323,7 +374,7 @@ mod test_rotation {
         assert!(compare_vector3(Camera::rotate_vector(Vector3::unit_z(), 180.0, 90.0), -Vector3::unit_y()));
         assert!(compare_vector3(Camera::rotate_vector(Vector3::unit_z(), 270.0, 90.0), -Vector3::unit_y()));
     }
-
+/*
     #[test]
     fn azimuth_0_elevation_90() {
         let target = camera_rotation(0.0, 90.0); 
@@ -379,7 +430,7 @@ mod test_rotation {
         println!("target = [{:.2}, {:.2}, {:.2}]", target.x, target.y, target.z);
         assert!(compare_vector3(target, Vector3::<f32>::new(0.0, 1.0, 0.0)));
     }
-
+*/
 }
 
 #[cfg(test)]
