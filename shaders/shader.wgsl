@@ -33,9 +33,10 @@ const custom_view = mat4x4<f32>(
 );
 
 struct CameraUniform {
-    view_proj: mat4x4<f32>,
-    //angular: f32,
-    //radial: f32,
+    fovx: f32,
+    fovy: f32,
+    azimuth: f32,
+    elevation: f32,
 };
 @group(0) @binding(0)
 var t_diffuse: texture_2d<f32>;
@@ -44,16 +45,16 @@ var s_diffuse: sampler;
 @group(1) @binding(0) // 1.
 var<uniform> camera: CameraUniform;
 
-
-/*
-  longitude = [0° - 360°]
-  colatitude = [0° - 180°] from north pole (with equator at 90°)
-*/
-fn spherical_to_equirectangular(longitude: f32, colatitude: f32) -> vec2<f32> {
-   vec2<f32>(
-      longitude / 360.0,
-      colatitude / 180.0
-   ); 
+fn screen_to_spheric(screen: vec2<f32>, fov: vec2<f32>, camera_azimuth: f32, camera_elevation: f32) -> vec2<f32> {
+  let sx = fov.x * screen.x;
+  let sy = fov.y * screen.y;
+  let latitude = 90.0 - camera_elevation - sy;
+  let latitude_rad = radians(latitude);
+  let elevation = 90.0 - latitude;
+  let cz = cos(latitude_rad);
+  //let azimuth = (camera_azimuth + sx.atan2(cz).to_degrees() + 360.0) % 360.0;
+  let azimuth = camera_azimuth + (degrees(atan2(sx, cz)) + 360.0) % 360.0;
+  return vec2<f32>(azimuth, elevation);
 }
 
 @fragment
@@ -68,6 +69,18 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     let uv_corrected = vec2<f32>(uv.x, -uv.y); // Inverser Y pour le système d'écran
 
+    let spheric = screen_to_spheric(
+      uv_corrected,
+      vec2<f32>(camera.fovx, camera.fovy),
+      camera.azimuth,
+      camera.elevation
+      );
+
+    let tex_coords = spheric / vec2<f32>(360.0, 180.0);
+
+    var color = textureSample(t_diffuse, s_diffuse, tex_coords);
+    return color;
+/*
     // Générer un rayon directionnel depuis le centre de la sphère
     let direction = normalize(vec3<f32>(uv_corrected, 1.0));
 
@@ -146,5 +159,6 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     //old
     //return textureSample(t_diffuse, s_diffuse, coords);
+*/
 }
 
