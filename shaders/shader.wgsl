@@ -24,6 +24,7 @@ fn vs_main(
 
 // Fragment shader
 const PI = 3.141592654;
+const two_PI = 2*PI;
 
 const custom_view = mat4x4<f32>(
   0.0, 0.5, 0.7, 0.0,
@@ -59,31 +60,28 @@ fn screen_to_spheric(screen: vec2<f32>, fov: vec2<f32>, camera_azimuth: f32, cam
 }
 
 fn project(raycast: vec3<f32>, camera_matrix: mat4x4<f32>) -> vec2<f32> {
-  let world = camera_matrix * vec4<f32>(raycast, 0.0);
-  let azimuth = atan2(world.z, world.x);
-  let elevation = asin(world.y);
-  return vec2<f32>(degrees(azimuth)+180.0, degrees(elevation));
+  let world = camera_matrix * normalize(vec4<f32>(raycast, 0.0));
+  let azimuth = (two_PI + atan2(world.x, world.z)) % (two_PI);
+  let elevation = abs(acos(world.y));
+  return vec2<f32>(degrees(azimuth), degrees(elevation));
 }
 
 fn spheric_to_texture(azimuth: f32, elevation: f32) -> vec4<f32> {
-  if(azimuth < 0.0) {return vec4<f32>(1.0, 0.0, 0.0, 0.0);}
-  if(azimuth > 360.0) {return vec4<f32>(0.0, 0.0, 1.0, 0.0);}
-
   return textureSample(t_diffuse, s_diffuse, vec2<f32>(azimuth/360.0, elevation/180.0));
 }
 
 fn spheric_to_color(azimuth: f32, elevation: f32) -> vec4<f32> {
-  var r = (azimuth / 360.0) + (azimuth*10.0)%360.0;
-  var g = 0.1;
-  var b = ((elevation + 90.0) / (180.0 * 2.0)) + (elevation/abs(elevation))*0.1;
+  var r = ((azimuth*10.0)%360.0)/360.0;
+  var g = 0.0;
+  var b = ((elevation*8.0)%180.0)/180.0;//((elevation + 90.0) / (180.0 * 2.0)) + (elevation/abs(elevation))*0.1;
   
   //if elevation > 0.0 {g=0.9;}
 
   if azimuth < 0.0 || azimuth > 360.0 {
-    return vec4<f32>(0.0, 0.0, 0.0, 0.0);
+    return vec4<f32>(0.0, 1.0, 0.0, 0.0);
   }
-  if elevation < -90.0 || elevation > 90.0 {
-    return vec4<f32>(0.0, 0.0, 0.0, 0.0);
+  if elevation < 0 || elevation > 180.0 {
+    return vec4<f32>(1.0, 1.0, 0.0, 0.0);
   }
 
   return vec4<f32>(r, g, b, 0.0);
@@ -100,19 +98,6 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let uv = (coords / screen_size) * 2.0 - vec2<f32>(1.0, 1.0);
 
     let uv_corrected = vec2<f32>(uv.x, -uv.y); // Inverser Y pour le système d'écran
-/*
-    let spheric = screen_to_spheric(
-      uv_corrected,
-      vec2<f32>(camera.fovx, camera.fovy),
-      camera.azimuth,
-      camera.elevation
-      );
-
-    let tex_coords = spheric / vec2<f32>(360.0, 180.0);
-
-    var color = textureSample(t_diffuse, s_diffuse, tex_coords);
-    return color;
-*/
 
     // Générer un rayon directionnel depuis le centre de la sphère
     let direction = normalize(vec3<f32>(uv_corrected, 1.0));
@@ -122,81 +107,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     //let world_dir = normalize((custom_view * vec4<f32>(direction, 0.0)).xyz);
     
     let spheric = project(direction, camera.view_proj);
-    //var color = textureSample(t_diffuse, s_diffuse, spheric);
-    //var color = spheric_to_color(spheric.x, spheric.y); // debug colors
     var color = spheric_to_texture(spheric.x, spheric.y); // debug colors
     return color;
-/*
-    // Convertir le vecteur directionnel en coordonnées sphériques
-    let theta = atan2(world_dir.z, world_dir.x); // Azimut
-    let phi = asin(world_dir.y);                // Élévation
-
-    // Convertir les coordonnées sphériques en UV pour échantillonner la texture
-    let projection = true;
-    var u : f32;
-    var v : f32;
-    if(projection) {
-      u = (theta / (2.0 * PI)) + 0.5; // Normaliser dans [0, 1]
-      v = 1.0 - ((phi + (PI / 2.0)) / PI); // Normaliser dans [0, 1]
-    }
-    else {
-      u = coords.x/1920.0;
-      v = coords.y/1080.0;
-    }
-
-
-    // debug color
-    let debug_color = true;
-    var color = textureSample(t_diffuse, s_diffuse, vec2<f32>(u, v));
-
-    if(debug_color) {
-      var red = 0.5 * v;
-      var blue = 0.5 - (v * 0.5);
-      var green = (((u*16)%1) * 0.1) + (((v*32)%1) * 0.1);
-
-      color = vec4f(red, green, blue, 0.0);
-    }
-
-    // draw grid lines
-    let horizontal_line_size = 0.001;
-    let vertical_line_size = 0.001;
-    if ( abs(v - 0.5) < horizontal_line_size) { // Equator
-      color = vec4f(0.0 , 0.0, 0.0, 0.0); // black
-    }
-    if ( abs(u - 0.0) < vertical_line_size ) { // North
-      color = vec4f(1.0 , 0.0, 0.0, 0.0); // red
-    }
-    if ( abs(u - 0.5) < vertical_line_size ) { // South
-      color = vec4f(1.0 , 1.0, 0.0, 0.0); // yellow 
-    }
-    if ( abs(u - 0.25) < vertical_line_size ) { // East 
-      color = vec4f(0.0 , 0.0, 1.0, 0.0); // blue
-    }
-    if ( abs(u - 0.75) < vertical_line_size ) { // West
-      color = vec4f(0.0 , 1.0, 1.0, 0.0); // cyan
-    }
-
-    let show_crosshair = true;
-    if(show_crosshair) {
-      // draw crosshair
-      if((abs(uv.x) < 0.002 /*&& abs(uv.y) < 0.08*/) || // vertical line
-          (abs(uv.y) < 0.004 /*&& abs(uv.x) < 0.008*/)) { // horizontal line
-        color = vec4f(0.5 , 0.5, 0.5, 0.0);
-      }
-    }
-
-    //let color = vec4f(((u*36)%1), (32*v)%1, v, 0);
-    return color;
-
-    // Échantillonner la texture équirectangulaire
-    //return textureSample(t_diffuse, s_diffuse, vec2<f32>(u, v));
-  
-    //test
-    //let toto = vec2<f32>(world_dir)
-    //return textureSample(t_diffuse, s_diffuse, uv_corrected);
-
-    //old
-    //return textureSample(t_diffuse, s_diffuse, coords);
-*/
 }
 

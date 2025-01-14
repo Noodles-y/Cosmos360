@@ -32,13 +32,6 @@ pub struct Camera {
 impl Camera {
 
     pub fn new(screen: PhysicalSize<u32>) -> Self {
-
-        /*println!("Aspect ratio : {} / {} = {}",
-            screen.width as f32,
-            screen.height as f32,
-            screen.width as f32 / screen.height as f32
-            );
-*/
         Self {
             coordinates: PolarCoordinate{angular:0.0,radial:90.0},
             radial_max_range: 90.0, 
@@ -72,46 +65,6 @@ impl Camera {
         view
     }
 
-    fn build_view_projection_matrix(&self) -> cgmath::Matrix4<f32> {
-        //use cgmath::{Vector3, InnerSpace};
-        //let view = cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up);
-        //let view = cgmath::Matrix4::look_at_rh(self.target, self.eye, self.up);
-
-        //let fovx_rad = self.fovx.to_radians();
-        //let fovy_rad = 2.0 * ((0.5 * fovx_rad).tan() / self.aspect).atan();
-        //let fovy = fovy_rad.to_degrees();
-        let fovy = Self::fovx_to_fovy(self.fovx, self.aspect);
-
-        // test
-        let target = self.target;
-        let up = self.up;
-        //let target = -Vector3::unit_y();
-        //let up = -Vector3::unit_x();
-
-        let view = cgmath::Matrix4::look_to_lh(self.eye, target, up);
-        //let view = cgmath::Matrix4::look_to_rh(self.eye, -Vector3::unit_y(), -Vector3::unit_z());
-        Self::display_matrix("east-down target", cgmath::Matrix4::look_to_lh(self.eye, -Vector3::unit_y(), -Vector3::unit_z()));
-        
-        let proj = cgmath::perspective(Deg(fovy), self.aspect, self.znear, self.zfar);
-        
-        Self::display_matrix("view", view);
-
-        let view_proj = OPENGL_TO_WGPU_MATRIX * proj * view;
-        //let view_proj = OPENGL_TO_WGPU_MATRIX * view;
-        
-        println!("coordinates : angular = {:.0} radial = {:.0} ", self.coordinates.angular, self.coordinates.radial);
-        println!("target : [{:.2}, {:.2}, {:.2}] up :  [{:.2}, {:.2}, {:.2}]",
-            self.target.x, self.target.y, self.target.z,
-            self.up.x, self.up.y, self.up.z,
-            );
-        //println!("current fovx : {} fovy : {}", self.fovx, fovy);
-        //println!("Matrix View : {:?}", view);
-        //println!("Matrix Proj : {:?}", proj);
-        //println!("Matrix VwPj : {:?}", view_proj);
-
-        return view_proj;
-        //return proj * view;
-    }
 
     pub fn orientation(&self) -> &PolarCoordinate {
         &self.coordinates
@@ -128,34 +81,6 @@ impl Camera {
             self.target.x, self.target.y, self.target.z,
             self.up.x, self.up.y, self.up.z,
             );
-        
-        /*
-        //use cgmath::{InnerSpace, Deg, Quaternion, Rotation3, Rotation, Vector3};
-
-        self.coordinates.angular += angular_delta;
-        self.coordinates.radial += radial_delta;
-
-        // normalize angular coordinates [0;360]
-        self.coordinates.angular = (self.coordinates.angular % 360.0 + 360.0) % 360.0;
-        // normalize radial coordinates [-max_range;max_range]
-        self.coordinates.radial = self.coordinates.radial.clamp(-self.radial_max_range, self.radial_max_range);
-        
-        //self.target = Self::compute_target(self.coordinates.angular, self.coordinates.radial);
-        //self.up = Self::compute_up(self.target, self.coordinates.angular);
-
-        
-        let right = Quaternion::from_axis_angle(Vector3::unit_y(), Deg((self.coordinates.angular + 90.0) % 360.0))
-            .rotate_vector(Vector3::unit_z());
-        // compute target vector
-        let radial_rotation = Quaternion::from_axis_angle(Vector3::unit_x(), Deg(self.coordinates.radial));
-        let angular_rotation = Quaternion::from_axis_angle(Vector3::unit_y(), Deg(self.coordinates.angular));
-
-        self.target = radial_rotation.rotate_vector(Vector3::unit_z()).normalize();
-        self.target = angular_rotation.rotate_vector(self.target).normalize();
-
-        // compute up vector
-        self.up = self.target.cross(right).normalize();
-        */
     }
 
     fn move_coordinates(&mut self, angular_delta: f32, radial_delta: f32) {
@@ -186,7 +111,7 @@ impl Camera {
     //pub fn rotation_matrix(azimuth_deg: f32, elevation_deg: f32) -> Matrix4<f32> {
     pub fn rotation_matrix(&self) -> Matrix4<f32> {
         let rotation_elevation = Matrix4::<f32>::from_angle_x(Deg(90.0 - self.coordinates.radial));
-        let rotation_azimuth = Matrix4::<f32>::from_angle_y(Deg(self.coordinates.angular));
+        let rotation_azimuth = Matrix4::<f32>::from_angle_y(Deg(-self.coordinates.angular));
 
         rotation_azimuth * rotation_elevation
     }
@@ -260,10 +185,8 @@ impl CameraUniform {
     }
 
     pub fn update_view_proj(&mut self, camera: &Camera) {
-        //self.view_proj = camera.build_view_projection_matrix().into();
-        
-        self.view_proj = (camera.perspective_matrix() * camera.rotation_matrix()).into();
-
+        //self.view_proj = (camera.perspective_matrix() * camera.rotation_matrix()).into();
+        self.view_proj = camera.rotation_matrix().into();
         (self.fovx, self.fovy) = camera.get_fov();
         self.azimuth = camera.orientation().angular;
         self.elevation = camera.orientation().radial;
