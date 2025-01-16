@@ -26,38 +26,28 @@ fn vs_main(
 const PI = 3.141592654;
 const two_PI = 2*PI;
 
-const custom_view = mat4x4<f32>(
-  0.0, 0.5, 0.7, 0.0,
-  0.0, -0.5, 0.7, 0.0,
-  0.7, 0.0, 0.0, 0.0,
-  0.0, 0.0, 0.0, 1.0
-);
-
 struct CameraUniform {
+    //width: f32,
+    //height: f32,
+    //focal_length: f32,
     view_proj: mat4x4<f32>,
-    fovx: f32,
-    fovy: f32,
-    azimuth: f32,
-    elevation: f32,
+    //width: f32,
 };
+
+struct CameraSettings {
+    width: f32,
+    height: f32,
+    focal_length: f32,
+};
+
 @group(0) @binding(0)
 var t_diffuse: texture_2d<f32>;
 @group(0) @binding(1)
 var s_diffuse: sampler;
 @group(1) @binding(0) // 1.
 var<uniform> camera: CameraUniform;
-
-fn screen_to_spheric(screen: vec2<f32>, fov: vec2<f32>, camera_azimuth: f32, camera_elevation: f32) -> vec2<f32> {
-  let sx = fov.x * screen.x;
-  let sy = fov.y * screen.y;
-  let latitude = 90.0 - camera_elevation - sy;
-  let latitude_rad = radians(latitude);
-  let elevation = 90.0 - latitude;
-  let cz = cos(latitude_rad);
-  //let azimuth = (camera_azimuth + sx.atan2(cz).to_degrees() + 360.0) % 360.0;
-  let azimuth = camera_azimuth + (degrees(atan2(sx, cz)) + 360.0) % 360.0;
-  return vec2<f32>(azimuth, elevation);
-}
+@group(2) @binding(0)
+var<uniform> settings: CameraSettings;
 
 fn project(raycast: vec3<f32>, camera_matrix: mat4x4<f32>) -> vec2<f32> {
   let world = camera_matrix * normalize(vec4<f32>(raycast, 0.0));
@@ -96,15 +86,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     // Normaliser les coordonnées du fragment dans [-1, 1]
     let uv = (coords / screen_size) * 2.0 - vec2<f32>(1.0, 1.0);
-
     let uv_corrected = vec2<f32>(uv.x, -uv.y); // Inverser Y pour le système d'écran
 
     // Générer un rayon directionnel depuis le centre de la sphère
-    let direction = normalize(vec3<f32>(uv_corrected, 1.0));
-
-    // Transformer le rayon dans l'espace de la caméra
-    //let world_dir = normalize((camera.view_proj * vec4<f32>(direction, 0.0)).xyz);
-    //let world_dir = normalize((custom_view * vec4<f32>(direction, 0.0)).xyz);
+    let direction = normalize(vec3<f32>(uv_corrected, settings.focal_length));
     
     let spheric = project(direction, camera.view_proj);
     var color = spheric_to_texture(spheric.x, spheric.y); // debug colors

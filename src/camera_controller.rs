@@ -110,6 +110,7 @@ impl CameraController {
             else if self.decrease_fov {-1.0}
             else {0.0};
         camera.change_fov(delta_fov * self.speed);
+        camera.change_focal_length(delta_fov * self.speed);
     }
 }
 

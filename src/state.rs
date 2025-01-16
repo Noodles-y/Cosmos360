@@ -2,6 +2,7 @@ use futures::executor;
 use crate::image_data::ImageData;
 use crate::camera::Camera;
 use crate::camera::CameraUniform;
+use crate::camera::CameraSettingsBuffer;
 use crate::camera_controller::CameraController;
 
 use winit::window::Window;
@@ -76,6 +77,9 @@ pub struct State {
     camera_uniform: CameraUniform,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
+    settings: CameraSettingsBuffer,
+    settings_buffer: wgpu::Buffer,
+    settings_bind_group: wgpu::BindGroup,
     camera_controller: CameraController,
 }
 
@@ -94,7 +98,16 @@ impl State {
         surface.configure(&device, &config);
         
         // Setup camera
-        let (camera, camera_uniform, camera_buffer, camera_bind_group, camera_bind_group_layout) = Self::create_camera(size, &device);
+        let (camera,
+            camera_uniform,
+            camera_buffer,
+            camera_bind_group,
+            camera_bind_group_layout,
+            settings,
+            settings_buffer,
+            settings_bind_group,
+            settings_bind_group_layout
+            ) = Self::create_camera(size, &device);
         
         let (image_data, texture_bind_group_layout, diffuse_bind_group) = Self::create_texture(&device, &queue);
         
@@ -105,6 +118,7 @@ impl State {
             &config, 
             &texture_bind_group_layout,
             &camera_bind_group_layout,
+            &settings_bind_group_layout,
         );
 
         let vertex_buffer = device.create_buffer_init(
@@ -136,6 +150,9 @@ impl State {
             camera_uniform,
             camera_buffer,
             camera_bind_group,
+            settings,
+            settings_buffer,
+            settings_bind_group,
             camera_controller,
         }
     }
@@ -215,6 +232,7 @@ impl State {
         config: &wgpu::SurfaceConfiguration,
         texture_bind_group_layout: &wgpu::BindGroupLayout,
         camera_bind_group_layout: &wgpu::BindGroupLayout,
+        settings_bind_group_layout: &wgpu::BindGroupLayout,
         ) -> wgpu::RenderPipeline {
 
         let render_pipeline_layout =
@@ -223,6 +241,7 @@ impl State {
                 bind_group_layouts: &[
                     &texture_bind_group_layout,
                     &camera_bind_group_layout,
+                    &settings_bind_group_layout,
                 ],
                 push_constant_ranges: &[],
             });
@@ -391,7 +410,11 @@ impl State {
         CameraUniform,
         wgpu::Buffer,
         wgpu::BindGroup, 
-        wgpu::BindGroupLayout
+        wgpu::BindGroupLayout,
+        CameraSettingsBuffer,
+        wgpu::Buffer,
+        wgpu::BindGroup, 
+        wgpu::BindGroupLayout,
     ) {
     
         let camera = Camera::new(size);
@@ -434,7 +457,53 @@ impl State {
             label: Some("camera_bind_group"),
         });
 
-        (camera, camera_uniform, camera_buffer, camera_bind_group, camera_bind_group_layout)
+        let mut settings = CameraSettingsBuffer::new();
+        settings.update(&camera);
+        let settings_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Camera Settings Buffer"),
+                contents: bytemuck::cast_slice(&[settings]),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            }
+        );
+
+        let settings_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }
+            ],
+            label: Some("settings_bind_group_layout"),
+        });
+
+        let settings_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &settings_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: settings_buffer.as_entire_binding(),
+                }
+            ],
+            label: Some("settings_bind_group"),
+        });
+
+        (camera,
+         camera_uniform,
+         camera_buffer,
+         camera_bind_group,
+         camera_bind_group_layout,
+         settings,
+         settings_buffer,
+         settings_bind_group,
+         settings_bind_group_layout,
+         )
     }
 
     pub fn window(&self) -> &Window {
@@ -458,7 +527,9 @@ impl State {
         println!("update screen");
         self.camera_controller.update_camera(&mut self.camera);
         self.camera_uniform.update_view_proj(&self.camera);
+        self.settings.update(&self.camera);
         self.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[self.camera_uniform]));
+        self.queue.write_buffer(&self.settings_buffer, 0, bytemuck::cast_slice(&[self.settings]));
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -495,6 +566,7 @@ impl State {
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]); 
             render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
+            render_pass.set_bind_group(2, &self.settings_bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
 
             render_pass.draw(0..self.num_vertices,0..1);

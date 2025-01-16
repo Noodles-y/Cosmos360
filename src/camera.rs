@@ -23,10 +23,12 @@ pub struct Camera {
     //pub target: cgmath::Point3<f32>,
     pub target: Vector3<f32>,
     pub up: Vector3<f32>,
+    pub size: PhysicalSize<u32>,
     aspect: f32,
     fovx: f32,
     znear: f32,
     zfar: f32,
+    focal_length: f32,
 }
 
 impl Camera {
@@ -38,10 +40,12 @@ impl Camera {
             eye: (0.0, 0.0, 0.0).into(),
             target: (0.0, 0.0, 1.0).into(),
             up: cgmath::Vector3::unit_y(),
+            size: screen,
             aspect: screen.width as f32 / screen.height as f32,
             fovx: 142.0,
             znear: 0.1,
             zfar: 100.0,
+            focal_length: 2.0,
         }
     }
 
@@ -123,7 +127,10 @@ impl Camera {
         //self.up = Self::rotate_vector(-Vector3::unit_z(), self.coordinates.angular, self.coordinates.radial);
 
     }
-
+    pub fn change_focal_length(&mut self, delta: f32) {
+        self.focal_length = (self.focal_length+delta).clamp(0.1, 100.0);
+        println!("focal length set to {}",self.focal_length);
+    }
 
     pub fn change_fov(&mut self, delta_fov: f32) {
         let new_fovy = Self::fovx_to_fovy(self.fovx+delta_fov, self.aspect); 
@@ -165,31 +172,43 @@ pub struct CameraUniform {
     // We can't use cgmath with bytemuck directly, so we'll have
     // to convert the Matrix4 into a 4x4 f32 array
     view_proj: [[f32; 4]; 4],
-    fovx: f32,
-    fovy: f32,
-    azimuth: f32,
-    elevation: f32,
+    //focal_length: f32,
 }
 
 impl CameraUniform {
-    //use Camera::get_rotation_matrix;
     pub fn new() -> Self {
         use cgmath::SquareMatrix;
         Self {
             view_proj: cgmath::Matrix4::identity().into(),
-            fovx: 1.0,
-            fovy: 1.0,
-            azimuth: 0.0,
-            elevation: 0.0,
         }
     }
 
     pub fn update_view_proj(&mut self, camera: &Camera) {
-        //self.view_proj = (camera.perspective_matrix() * camera.rotation_matrix()).into();
         self.view_proj = camera.rotation_matrix().into();
-        (self.fovx, self.fovy) = camera.get_fov();
-        self.azimuth = camera.orientation().angular;
-        self.elevation = camera.orientation().radial;
+    }
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct CameraSettingsBuffer {
+    width: f32,
+    height: f32,
+    focal_length: f32,
+}
+
+impl CameraSettingsBuffer {
+    pub fn new() -> Self {
+        Self {
+            width: 2.0,
+            height: 2.0,
+            focal_length: 1.0,
+        }
+    }
+
+    pub fn update(&mut self, camera: &Camera) {
+        self.width = camera.size.width as f32;
+        self.height = camera.size.height as f32;
+        self.focal_length = camera.focal_length;
     }
 }
 
