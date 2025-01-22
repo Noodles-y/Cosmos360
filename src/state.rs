@@ -65,8 +65,8 @@ pub struct State {
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
     queue: wgpu::Queue,
-    _config: wgpu::SurfaceConfiguration,
-    _size: winit::dpi::PhysicalSize<u32>,
+    config: wgpu::SurfaceConfiguration,
+    size: winit::dpi::PhysicalSize<u32>,
     render_pipeline: wgpu::RenderPipeline,
     window: Arc<Window>,
     vertex_buffer: wgpu::Buffer,
@@ -139,8 +139,8 @@ impl State {
             surface,
             device,
             queue,
-            _config: config,
-            _size: size,
+            config,
+            size,
             render_pipeline,
             vertex_buffer,
             num_vertices,
@@ -458,7 +458,7 @@ impl State {
         });
 
         let mut settings = CameraSettingsBuffer::new();
-        settings.update(&camera);
+        settings.resize(size.width as f32, size.height as f32);
         let settings_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
                 label: Some("Camera Settings Buffer"),
@@ -510,13 +510,12 @@ impl State {
         &self.window
     }
 
-    pub fn _resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
-        self._size = new_size;
-
-        self._config.width = new_size.width;
-        self._config.height = new_size.height;
-
-        self.surface.configure(&self.device, &self._config);
+    pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
+        self.size = new_size;
+        self.config.width = new_size.width;
+        self.config.height = new_size.height;
+        self.surface.configure(&self.device, &self.config);
+        self.settings.resize(self.config.width as f32,self.config.height as f32);
     }
 
     pub fn input(&mut self, event: &WindowEvent) -> bool {
@@ -524,19 +523,15 @@ impl State {
     }
 
     pub fn update(&mut self) {
-        println!("update screen");
-        self.camera_controller.update_camera(&mut self.camera);
+        self.camera_controller.update_camera(&mut self.camera, &mut self.settings);
         self.camera_uniform.update_view_proj(&self.camera);
-        self.settings.update(&self.camera);
         self.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[self.camera_uniform]));
         self.queue.write_buffer(&self.settings_buffer, 0, bytemuck::cast_slice(&[self.settings]));
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
-
         let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
-
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Render Encoder"),
         });

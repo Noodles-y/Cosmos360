@@ -8,7 +8,7 @@ use winit::keyboard::{
     PhysicalKey,
 };
 
-use crate::camera::Camera;
+use crate::camera::{Camera, CameraSettingsBuffer};
 
 pub struct CameraController {
     speed: f32,
@@ -44,8 +44,6 @@ impl CameraController {
                     },
                 ..
             } => {
-                //let is_pressed = *state == ElementState::Pressed;// bizarre, on devrait utiliser
-                                                                 // state.is_pressed()
                 let is_pressed = state.is_pressed();
                 match keycode {KeyCode::KeyW | KeyCode::ArrowUp => {
                         println!("Press key Up : {}", is_pressed);
@@ -84,7 +82,7 @@ impl CameraController {
         }
     }
 
-    pub fn update_camera(&self, camera: &mut Camera) {
+    pub fn update_camera(&self, camera: &mut Camera, settings: &mut CameraSettingsBuffer) {
         let (mut angular_delta, mut radial_delta) = (0.0, 0.0);
 
         if self.is_right_pressed {
@@ -105,12 +103,11 @@ impl CameraController {
 
         camera.rotate(angular_delta, radial_delta);
 
-        let delta_fov = 
-            if self.increase_fov {1.0}
-            else if self.decrease_fov {-1.0}
-            else {0.0};
-        camera.change_fov(delta_fov * self.speed);
-        camera.change_focal_length(delta_fov * self.speed);
+        let zoom_factor = 
+            if self.increase_fov {1.1}
+            else if self.decrease_fov {0.9}
+            else {1.0};
+        settings.zoom(zoom_factor);
     }
 }
 

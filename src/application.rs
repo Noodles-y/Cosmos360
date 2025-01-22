@@ -65,6 +65,9 @@ impl ApplicationHandler for Application {
                         self.state.as_mut().unwrap().render().unwrap();// use unwrap() to panic in case
                                                                        // of render fail
                     }
+                    WindowEvent::Resized(new_size) => {
+                        self.state.as_mut().unwrap().resize(new_size);
+                    }
                     _ => (),
                 }
             }

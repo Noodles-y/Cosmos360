@@ -23,29 +23,29 @@ pub struct Camera {
     //pub target: cgmath::Point3<f32>,
     pub target: Vector3<f32>,
     pub up: Vector3<f32>,
-    pub size: PhysicalSize<u32>,
-    aspect: f32,
-    fovx: f32,
+    //pub size: PhysicalSize<u32>,
+    //aspect: f32,
+    //fovx: f32,
     znear: f32,
     zfar: f32,
-    focal_length: f32,
+    //focal_length: f32,
 }
 
 impl Camera {
 
-    pub fn new(screen: PhysicalSize<u32>) -> Self {
+    pub fn new(_screen: PhysicalSize<u32>) -> Self {
         Self {
             coordinates: PolarCoordinate{angular:0.0,radial:90.0},
             radial_max_range: 90.0, 
             eye: (0.0, 0.0, 0.0).into(),
             target: (0.0, 0.0, 1.0).into(),
             up: cgmath::Vector3::unit_y(),
-            size: screen,
-            aspect: screen.width as f32 / screen.height as f32,
-            fovx: 142.0,
+            //size: screen,
+            //aspect: screen.width as f32 / screen.height as f32,
+            //fovx: 142.0,
             znear: 0.1,
             zfar: 100.0,
-            focal_length: 2.0,
+            //focal_length: 2.0,
         }
     }
 
@@ -106,12 +106,6 @@ impl Camera {
         rotated_vector
     }
 
-    //pub fn perspective_matrix(fovx: f32, aspect: f32) -> Matrix4<f32> {
-    pub fn perspective_matrix(&self) -> Matrix4<f32> {
-        let fovy = Self::fovx_to_fovy(self.fovx, self.aspect);
-        cgmath::perspective(Deg(fovy), self.aspect, self.znear, self.zfar)
-    }
-
     //pub fn rotation_matrix(azimuth_deg: f32, elevation_deg: f32) -> Matrix4<f32> {
     pub fn rotation_matrix(&self) -> Matrix4<f32> {
         let rotation_elevation = Matrix4::<f32>::from_angle_x(Deg(90.0 - self.coordinates.radial));
@@ -127,41 +121,11 @@ impl Camera {
         //self.up = Self::rotate_vector(-Vector3::unit_z(), self.coordinates.angular, self.coordinates.radial);
 
     }
-    pub fn change_focal_length(&mut self, delta: f32) {
-        self.focal_length = (self.focal_length+delta).clamp(0.1, 100.0);
-        println!("focal length set to {}",self.focal_length);
-    }
+    //pub fn change_focal_length(&mut self, delta: f32) {
+    //    self.focal_length = (self.focal_length+delta).clamp(0.1, 100.0);
+    //    println!("focal length set to {}",self.focal_length);
+    //}
 
-    pub fn change_fov(&mut self, delta_fov: f32) {
-        let new_fovy = Self::fovx_to_fovy(self.fovx+delta_fov, self.aspect); 
-
-        if new_fovy > 0.0 && new_fovy < 360.0 {
-            self.fovx += delta_fov;
-        }
-
-        /*println!("current fovx = {} fovy = {}, new_fovy = {}", 
-            self.fovx, 
-            Self::fovx_to_fovy(self.fovx, self.aspect),
-            new_fovy,
-            );*/
-    }
-
-    pub fn set_fovx(&mut self, value: f32) {
-        let new_fovy = Self::fovx_to_fovy(value, self.aspect); 
-
-        if new_fovy > 0.0 && new_fovy < 360.0 {
-            self.fovx = value;
-        }
-        else
-        {
-            println!("Camera::set_fovx() : Invalid value (fovx={:.2} => fovy={:.2} [0.0 ; 360.0])", value, new_fovy);
-        }
-    }
-
-
-    pub fn get_fov(&self) -> (f32, f32) {
-        (self.fovx, Self::fovx_to_fovy(self.fovx, self.aspect))
-    }
 }
 
 // We need this for Rust to store our data correctly for the shaders
@@ -205,10 +169,13 @@ impl CameraSettingsBuffer {
         }
     }
 
-    pub fn update(&mut self, camera: &Camera) {
-        self.width = camera.size.width as f32;
-        self.height = camera.size.height as f32;
-        self.focal_length = camera.focal_length;
+    pub fn resize(&mut self, width: f32, height: f32) {
+        self.width = width;
+        self.height = height;
+    }
+
+    pub fn zoom(&mut self, multiplier: f32) {
+        self.focal_length = (self.focal_length * multiplier).clamp(0.001,1000.0);
     }
 }
 
