@@ -40,7 +40,6 @@ impl ApplicationHandler for Application {
         event: WindowEvent,
     ) {
         let state = self.state.as_mut().unwrap();
-        //let window = state.window();
 
         if state.window().id() == window_id {
             
@@ -53,15 +52,8 @@ impl ApplicationHandler for Application {
                         println!("Closing window");
                         event_loop.exit();
                     }
-                    //WindowEvent::KeyboardInput => {
-                    //    self.state.as_mut().unwrap().input(&event);
-                    //}
                     WindowEvent::RedrawRequested => {
-                        //executor::block_on( run(self.window.as_ref().unwrap(), &self.image_data) );
-                        //window.request_redraw();
-
                         self.state.as_mut().unwrap().update();
-
                         self.state.as_mut().unwrap().render().unwrap();// use unwrap() to panic in case
                                                                        // of render fail
                     }
