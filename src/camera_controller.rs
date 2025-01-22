@@ -12,6 +12,7 @@ use crate::camera::{Camera, CameraSettingsBuffer};
 
 pub struct CameraController {
     speed: f32,
+    mouse_sensibility: f32,
     is_up_pressed: bool,
     is_down_pressed: bool,
     is_left_pressed: bool,
@@ -21,9 +22,10 @@ pub struct CameraController {
 }
 
 impl CameraController {
-    pub fn new(speed: f32) -> Self {
+    pub fn new(speed: f32, mouse_sensibility: f32) -> Self {
         Self {
             speed,
+            mouse_sensibility,
             is_up_pressed: false,
             is_down_pressed: false,
             is_left_pressed: false,
@@ -108,6 +110,10 @@ impl CameraController {
             else if self.decrease_fov {0.9}
             else {1.0};
         settings.zoom(zoom_factor);
+    }
+    
+    pub fn move_cursor(&self, camera: &mut Camera, delta_x: f64, delta_y: f64) {
+        camera.rotate((-delta_x as f32) * self.mouse_sensibility, (-delta_y as f32) * self.mouse_sensibility);
     }
 }
 

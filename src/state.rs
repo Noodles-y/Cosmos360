@@ -131,7 +131,7 @@ impl State {
 
         let num_vertices = VERTICES.len() as u32;
 
-        let camera_controller = CameraController::new(2.0);
+        let camera_controller = CameraController::new(2.0, 0.05);
 
         // Return
         Self {
@@ -520,6 +520,10 @@ impl State {
 
     pub fn input(&mut self, event: &WindowEvent) -> bool {
         self.camera_controller.process_events(event)
+    }
+
+    pub fn move_camera_by_cursor(&mut self, delta_x: f64, delta_y: f64) {
+        self.camera_controller.move_cursor(&mut self.camera, delta_x, delta_y);
     }
 
     pub fn update(&mut self) {
