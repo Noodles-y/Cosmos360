@@ -200,7 +200,7 @@ impl State {
             instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::default(),
-                compatible_surface: Some(&surface),
+                compatible_surface: Some(surface),
                 force_fallback_adapter: false,
             })
         ).unwrap()
@@ -239,9 +239,9 @@ impl State {
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
                 bind_group_layouts: &[
-                    &texture_bind_group_layout,
-                    &camera_bind_group_layout,
-                    &settings_bind_group_layout,
+                    texture_bind_group_layout,
+                    camera_bind_group_layout,
+                    settings_bind_group_layout,
                 ],
                 push_constant_ranges: &[],
             });
@@ -250,7 +250,7 @@ impl State {
             label: Some("Render Pipeline"),
             layout: Some(&render_pipeline_layout),
             vertex: wgpu::VertexState {
-                module: &shader,
+                module: shader,
                 entry_point: Some("vs_main"), // 1.
                 buffers: &[
                     Vertex::desc(),    
@@ -258,7 +258,7 @@ impl State {
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState { // 3.
-                module: &shader,
+                module: shader,
                 entry_point: Some("fs_main"),
                 targets: &[Some(wgpu::ColorTargetState { // 4.
                     format: config.format,
@@ -336,7 +336,7 @@ impl State {
                 aspect: wgpu::TextureAspect::All,
             },
             // The actual pixel data
-            &diffuse_rgba,
+            diffuse_rgba,
             // The layout of the texture
             wgpu::ImageDataLayout {
                 offset: 0,

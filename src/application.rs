@@ -68,19 +68,16 @@ impl ApplicationHandler for Application {
 
     fn device_event(
         &mut self,
-        event_loop: &ActiveEventLoop,
-        device_id: DeviceId,
+        _event_loop: &ActiveEventLoop,
+        _device_id: DeviceId,
         event: DeviceEvent,
     ) {
-        match event {
-            DeviceEvent::MouseMotion {
-                delta: (mouse_x, mouse_y)
-            } => {
-                println!("Moved cursor ({};{})", mouse_x, mouse_y);
-                self.state.as_mut().unwrap().move_camera_by_cursor(mouse_x, mouse_y);
-                self.state.as_mut().unwrap().window().request_redraw();
-            }
-            _ => (),
+        if let DeviceEvent::MouseMotion {
+            delta: (mouse_x, mouse_y)
+        } = event {
+            println!("Moved cursor ({};{})", mouse_x, mouse_y);
+            self.state.as_mut().unwrap().move_camera_by_cursor(mouse_x, mouse_y);
+            self.state.as_mut().unwrap().window().request_redraw();
         }
 
     }
