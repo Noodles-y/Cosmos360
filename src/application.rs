@@ -3,9 +3,30 @@ use crate::state::State;
 use winit::{
     application::ApplicationHandler,
     event::{WindowEvent, DeviceEvent, DeviceId},
-    event_loop::ActiveEventLoop,
+    event_loop::{ActiveEventLoop, EventLoop,},
     window::{WindowId, WindowAttributes},
 };
+
+pub struct CosmosViewer {
+    app: Application,
+}
+
+impl CosmosViewer {
+
+    pub fn new() -> Self {
+        Self {
+            app: Application::new(),
+        }
+    }
+
+    fn create_event_loop() -> EventLoop<()> {
+        EventLoop::new().unwrap()
+    }
+    
+    pub fn run(&mut self) {
+        Self::create_event_loop().run_app(&mut self.app).unwrap();
+    }
+}
 
 pub struct Application {
     state: Option<State>,
@@ -18,6 +39,7 @@ impl Application {
             state: None,
         }
     }
+
 }
 
 impl ApplicationHandler for Application {
