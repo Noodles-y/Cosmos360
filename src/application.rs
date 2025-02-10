@@ -6,16 +6,16 @@ use winit::{
     event_loop::{ActiveEventLoop, EventLoop,},
     window::{WindowId, WindowAttributes},
 };
+use std::thread::JoinHandle;
+use std::result::Result;
 
 pub struct CosmosViewer {
-    app: Application,
 }
 
 impl CosmosViewer {
 
     pub fn new() -> Self {
         Self {
-            app: Application::new(),
         }
     }
 
@@ -23,8 +23,16 @@ impl CosmosViewer {
         EventLoop::new().unwrap()
     }
     
-    pub fn run(&mut self) {
-        Self::create_event_loop().run_app(&mut self.app).unwrap();
+    pub fn run() -> JoinHandle<()> {
+        //self.app = Application::new();
+        std::thread::spawn( || {
+            Self::create_event_loop().run_app(&mut Application::new()).unwrap();
+        })
+    }
+
+    pub fn load_image(&mut self) -> Result<(), &'static str> {
+        // TODO : load image
+        Ok(())
     }
 }
 

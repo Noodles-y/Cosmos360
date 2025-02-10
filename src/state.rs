@@ -4,6 +4,7 @@ use crate::camera::Camera;
 use crate::camera::CameraUniform;
 use crate::camera::CameraSettingsBuffer;
 use crate::camera_controller::CameraController;
+use crate::texture::Texture;
 
 use winit::window::Window;
 use winit::event::WindowEvent;
@@ -71,7 +72,6 @@ pub struct State {
     window: Arc<Window>,
     vertex_buffer: wgpu::Buffer,
     num_vertices: u32,
-    _image_data: ImageData,
     diffuse_bind_group: wgpu::BindGroup,
     camera: Camera,
     camera_uniform: CameraUniform,
@@ -109,7 +109,7 @@ impl State {
             settings_bind_group_layout
             ) = Self::create_camera(size, &device);
         
-        let (image_data, texture_bind_group_layout, diffuse_bind_group) = Self::create_texture(&device, &queue);
+        let (texture_bind_group_layout, diffuse_bind_group) = Self::create_texture(&device, &queue);
         
         let shader = Self::create_shader(&device);
         let render_pipeline = Self::create_render_pipeline(
@@ -144,7 +144,6 @@ impl State {
             render_pipeline,
             vertex_buffer,
             num_vertices,
-            _image_data: image_data,
             diffuse_bind_group,
             camera,
             camera_uniform,
@@ -290,10 +289,55 @@ impl State {
         })
     }
 
-    pub fn create_texture(device: &Device, queue: &Queue) -> (ImageData, wgpu::BindGroupLayout, wgpu::BindGroup) {
+    fn update_image_texture(image_data: &ImageData, device: &Device, queue: &Queue) -> wgpu::Texture {
+        let dimensions = image_data.dimensions();
+        let diffuse_rgba = image_data.rgba();
+        let texture_size = wgpu::Extent3d {
+            width: dimensions.0,
+            height: dimensions.1,
+            depth_or_array_layers: 1,
+        };
+        let diffuse_texture = device.create_texture(
+            &wgpu::TextureDescriptor {
+                size: texture_size,
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                label: Some("diffuse_texture"),
+                view_formats: &[],
+            }
+        );
+        queue.write_texture(
+            wgpu::ImageCopyTexture {
+                texture: &diffuse_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            diffuse_rgba,
+            wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: Some(4 * dimensions.0),
+                rows_per_image: Some(dimensions.1),
+            },
+            texture_size,
+        );
+
+        diffuse_texture
+    }
+
+    pub fn create_texture(device: &Device, queue: &Queue) -> (wgpu::BindGroupLayout, wgpu::BindGroup) {
     
         // Load Image
-        let image_data = ImageData::new("image.png"); 
+         let diffuse_texture = Self::update_image_texture(
+                &ImageData::new("image.png").unwrap(),
+                &device,
+                &queue,
+            );
+
+        /*let image_data = ImageData::new("image.png"); 
         let dimensions = image_data.dimensions();
         let diffuse_rgba = image_data.rgba();
         // Create Texture
@@ -345,6 +389,8 @@ impl State {
             },
             texture_size,
         );
+
+        */
 
         // We don't need to configure the texture view much, so let's
         // let wgpu define it.
@@ -402,7 +448,7 @@ impl State {
         );
 
         // return
-        (image_data, texture_bind_group_layout, diffuse_bind_group)
+        (texture_bind_group_layout, diffuse_bind_group)
     }
 
     fn create_camera(size: PhysicalSize<u32>, device: &Device) -> (

@@ -3,21 +3,23 @@ mod image_data;
 mod state;
 mod camera;
 mod camera_controller;
+mod texture;
 
-use application::Application;
-use winit::event_loop::{EventLoop,};
+use application::CosmosViewer;
 
-pub fn main() {
+pub fn main() -> Result<(), &'static str> {
 
-    let event_loop = EventLoop::new().unwrap();
+    //let event_loop = EventLoop::new().unwrap();
     //event_loop.set_control_flow(ControlFlow::Poll);
 
-    // create the application
-    let mut app = Application::new();
+    // load an image
+    let mut cosmos_viewer = CosmosViewer::new();
+    cosmos_viewer.load_image()?;
+    
+    // start the application
+    let handler = CosmosViewer::run();
 
-    // load the image
-    //let filename = "../image.png";
-    //app.load_image(filename);
+    let _ = handler.join();
 
-    event_loop.run_app(&mut app).unwrap();
+    Ok(())
 }
